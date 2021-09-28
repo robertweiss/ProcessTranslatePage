@@ -1,11 +1,13 @@
 <?php namespace ProcessWire;
 
 $excludedTemplatesOptions = [];
-foreach (wire('templates') as $template) {
-    if ($template->flags && $template->flags === Template::flagSystem) {
-        continue;
+if (wire('templates')) {
+    foreach (wire('templates') as $template) {
+        if ($template->flags && $template->flags === Template::flagSystem) {
+            continue;
+        }
+        $excludedTemplatesOptions[$template->name] = $template->get('label|name');
     }
-    $excludedTemplatesOptions[$template->name] = $template->get('label|name');
 }
 
 $config = [
