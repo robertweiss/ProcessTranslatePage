@@ -39,13 +39,19 @@ class ProcessTranslatePage extends Process implements Module {
 
         $this->addHookAfter("ProcessPageEdit::getSubmitActions", $this, "addDropdownOption");
         $this->addHookAfter("Pages::saved", $this, "hookPageSave");
+        $this->initSettings();
 
+        parent::init();
+    }
+
+    public function initSettings() {
         // Set (user-)settings
         $this->excludedTemplates = $this->get('excludedTemplates');
         $this->overwriteExistingTranslation = !!$this->get('overwriteExistingTranslation');
         $this->throttleSave = 5;
 
-        parent::init();
+        $this->fluency = $this->modules->get('Fluency');
+        $this->setLanguages();
     }
 
     public function hookPageSave($event) {
@@ -64,13 +70,9 @@ class ProcessTranslatePage extends Process implements Module {
             return;
         }
 
-        // Set fluency languages
-        $this->fluency = $this->modules->get('Fluency');
-        $this->setLanguages();
-
         // Let’s go!
         $this->processFields($page);
-        $this->message($this->translatedFieldsCount . __(' fields translated.'));
+        $this->message($this->translatedFieldsCount.__(' fields translated.'));
     }
 
     public function addDropdownOption($event) {
@@ -95,7 +97,7 @@ class ProcessTranslatePage extends Process implements Module {
         // 1022 is ID of default language
         $this->sourceLanguage = [
             'page' => $this->languages->get(1022),
-            'code' => $this->fluency->data['pw_language_1022']
+            'code' => $this->fluency->data['pw_language_1022'],
         ];
 
         foreach ($this->fluency->data as $key => $data) {
@@ -105,7 +107,7 @@ class ProcessTranslatePage extends Process implements Module {
             }
             $this->targetLanguages[] = [
                 'page' => $this->languages->get(str_replace('pw_language_', '', $key)),
-                'code' => $data
+                'code' => $data,
             ];
         }
     }
@@ -157,6 +159,11 @@ class ProcessTranslatePage extends Process implements Module {
                 $this->processFunctionalField($field, $page);
                 continue;
             }
+
+            if ($shortType == 'Table') {
+                $this->processTableField($field, $page);
+                continue;
+            }
         }
     }
 
@@ -174,6 +181,7 @@ class ProcessTranslatePage extends Process implements Module {
             $page->setLanguageValue($targetLanguage['page'], $fieldName, $result);
             $countField = true;
         }
+
         $page->save($fieldName);
         if ($countField) {
             $this->translatedFieldsCount++;
@@ -240,5 +248,35 @@ class ProcessTranslatePage extends Process implements Module {
             }
         }
         $page->save($field->name);
+    }
+
+    private function processTableField(Field $field, Page $page) {
+        $fieldName = $field->name;
+
+        foreach ($page->$field as $row) {
+            /** @var TableRow $row */
+            foreach ($row as $item) {
+                if ($item instanceof LanguagesPageFieldValue) {
+                    /** @var LanguagesPageFieldValue $item */
+                    $value = $item->getLanguageValue($this->sourceLanguage['page']);
+                    $countField = false;
+
+                    foreach ($this->targetLanguages as $targetLanguage) {
+                        // If field is empty or translation already exists und should not be overwritten, return
+                        if (!$value || ($item->getLanguageValue($targetLanguage['page']) != '' && !$this->overwriteExistingTranslation)) {
+                            continue;
+                        }
+                        $result = $this->translate($value, $targetLanguage['code']);
+                        $item->setLanguageValue($targetLanguage['page'], $result);
+                        $countField = true;
+                    }
+
+                    if ($countField) {
+                        $this->translatedFieldsCount++;
+                    }
+                }
+            }
+        }
+        $page->save($fieldName);
     }
 }
