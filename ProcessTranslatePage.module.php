@@ -1,9 +1,7 @@
 <?php namespace ProcessWire;
 
 /**
- * Translate page via fluency
- *
- * Translates all textfields on a page (including repeater(-matrix), file descriptions and functional fields)
+ * Translate all textfields on a page via Fluency
  *
  */
 class ProcessTranslatePage extends Process implements Module {
@@ -31,7 +29,6 @@ class ProcessTranslatePage extends Process implements Module {
         'RepeaterMatrix',
     ];
 
-    // https://processwire.com/talk/topic/12168-how-to-add-additional-button-next-to-the-save-button-on-top-backend/?do=findComment&comment=112883
     public function init() {
         if (!$this->user->hasPermission('fluency-translate')) {
             return;

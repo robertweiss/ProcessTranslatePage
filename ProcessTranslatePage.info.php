@@ -2,7 +2,7 @@
 
 $info = array(
 	'title' => 'TranslatePage (via Fluency)',
-	'summary' => 'Translates all textfields on a page (including repeater(-matrix), file descriptions and functional fields)',
+	'summary' => 'Translates all textfields on a page via Fluency',
 	'version' => 2,
 	'author' => 'Robert Weiss',
 	'icon' => 'language',
