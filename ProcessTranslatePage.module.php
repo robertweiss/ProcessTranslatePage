@@ -31,19 +31,6 @@ class ProcessTranslatePage extends Process implements Module {
         'RepeaterMatrix',
     ];
 
-    public static function getModuleInfo() {
-        return [
-            'title' => 'TranslatePage (via Fluency)',
-            'summary' => 'Translates all textfields on a page (including repeater(-matrix), file descriptions and functional fields)',
-            'version' => 1,
-            'author' => 'Robert Weiss',
-            'href' => 'http://modules.processwire.com/',
-            'singular' => true,
-            'autoload' => true,
-            'requires' => 'Fluency',
-        ];
-    }
-
     // https://processwire.com/talk/topic/12168-how-to-add-additional-button-next-to-the-save-button-on-top-backend/?do=findComment&comment=112883
     public function init() {
         $this->addHookAfter("ProcessPageEdit::buildForm", $this, "addButton");
