@@ -93,6 +93,24 @@ class ProcessTranslatePage extends Process implements Module {
         $event->return = $actions;
     }
 
+    public function translatePageTree(Page $page, bool $includeHidden = true) {
+        $this->initSettings();
+        // Only process page if template is valid
+        if (!in_array($page->template->name, array_merge($this->adminTemplates, $this->excludedTemplates))) {
+            $this->processFields($page);
+            echo "Process page {$page->title} ($page->id)\n";
+        } else {
+            echo "Ignore page {$page->title} ($page->id)\n";
+        }
+
+        $selector = ($includeHidden) ? 'include=hidden' : '';
+
+        // Iterate through all children and process them recursively
+        foreach ($page->children($selector) as $item) {
+            $this->translatePageTree($item);
+        }
+    }
+
     private function setLanguages() {
         // 1022 is ID of default language
         $this->sourceLanguage = [
