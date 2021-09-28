@@ -7,13 +7,13 @@
  *
  */
 class ProcessTranslatePage extends Process implements Module {
-    private $sourceLang;
-    private $targetLang;
-    private $sourceLangPage;
-    private $targetLangPage;
+    private $fluency;
+    private $sourceLanguage;
+    private $targetLanguages = [];
     private $excludedTemplates = [];
-    private $adminTemplates = ['admin', 'language', 'user'];
+    private $adminTemplates = ['admin', 'language', 'user', 'permission', 'role'];
     private $overwriteExistingTranslation;
+    private $translatedFieldsCount = 0;
 
     private $textFieldTypes = [
         'PageTitleLanguage',
@@ -33,68 +33,88 @@ class ProcessTranslatePage extends Process implements Module {
 
     // https://processwire.com/talk/topic/12168-how-to-add-additional-button-next-to-the-save-button-on-top-backend/?do=findComment&comment=112883
     public function init() {
-        $this->addHookAfter("ProcessPageEdit::buildForm", $this, "addButton");
+        if (!$this->user->hasPermission('fluency-translate')) {
+            return;
+        }
+
+        $this->addHookAfter("ProcessPageEdit::getSubmitActions", $this, "addDropdownOption");
         $this->addHookAfter("Pages::saved", $this, "hookPageSave");
 
-        // If post params have translate post value, trigger page save
-        if ($this->input->post->save_and_translate) {
-            $this->input->post->submit_save = 1;
-        }
+        // Set (user-)settings
+        $this->excludedTemplates = $this->get('excludedTemplates');
+        $this->overwriteExistingTranslation = !!$this->get('overwriteExistingTranslation');
+        $this->throttleSave = 5;
+
+        parent::init();
     }
 
     public function hookPageSave($event) {
         /** @var Page $page */
         $page = $event->arguments("page");
 
-        // Set fluency language codes, the corresponding pw languages and excluded templates
-        // TODO: move this part to module config
-        $this->sourceLangCode = 'DE';
-        $this->targetLangCode = 'EN-GB';
-        $this->sourceLangPage = languages()->get('default');
-        $this->targetLangPage = languages()->get('en');
-        $this->excludedTemplates = [];
-        $this->overwriteExistingTranslation = false;
-
         // Only start translating if post variable is set
-        if (!$this->input->post->save_and_translate) {
+        if ($this->input->post->_after_submit_action != 'save_and_translate') {
             return;
         }
 
-        // Throttle translations (only triggers every ten seconds)
-        if ($this->page->modified > (time() - 10)) {
-            $this->error('Translation is only allowed once every ten seconds. Please wait some time and try again.');
+        // Throttle translations (only triggers every after a set amount of time)
+        if ($this->page->modified > (time() - $this->throttleSave)) {
+            $this->error(__('Please wait some time before you try to translate again.'));
 
             return;
         }
+
+        // Set fluency languages
+        $this->fluency = $this->modules->get('Fluency');
+        $this->setLanguages();
 
         // Let’s go!
         $this->processFields($page);
+        $this->message($this->translatedFieldsCount . __(' fields translated.'));
     }
 
-    public function addButton($event) {
-        $page = $event->object->getPage();
+    public function addDropdownOption($event) {
+        /** @var Page $page */
+        $page = $this->pages->get($this->input->get->id);
 
-        // Don’t show button in excluded or admin templates
+        // Don’t show option in excluded or admin templates
         if (in_array($page->template->name, array_merge($this->adminTemplates, $this->excludedTemplates))) {
             return;
         }
 
-        if (!user()->hasPermission('fluency-translate')) {
-            return;
-        }
-
-        $form = $event->return;
-
-        $button = $this->modules->InputfieldSubmit;
-        $button->attr('name', 'save_and_translate');
-        $button->attr('value', __('Save and translate'));
-        $button->class .= ' ui-priority-secondary head_button_clone';
-        $form->insertAfter($button, $form->get('submit_save'));
+        $actions = $event->return;
+        $actions[] = [
+            'value' => 'save_and_translate',
+            'icon' => 'language',
+            'label' => __('Save + Translate'),
+        ];
+        $event->return = $actions;
     }
 
-    private function translate(String $value): string {
-        $fluency = modules()->get('Fluency');
-        $result = $fluency->translate($this->sourceLangCode, $value, $this->targetLangCode);
+    private function setLanguages() {
+        // 1022 is ID of default language
+        $this->sourceLanguage = [
+            'page' => $this->languages->get(1022),
+            'code' => $this->fluency->data['pw_language_1022']
+        ];
+
+        foreach ($this->fluency->data as $key => $data) {
+            // Ignore non language keys and default language key
+            if (strpos($key, 'pw_language_') !== 0 || $key === 'pw_language_1022') {
+                continue;
+            }
+            $this->targetLanguages[] = [
+                'page' => $this->languages->get(str_replace('pw_language_', '', $key)),
+                'code' => $data
+            ];
+        }
+    }
+
+    private function translate(string $value, string $targetLanguageCode): string {
+        if (!$targetLanguageCode) {
+            return '';
+        }
+        $result = $this->fluency->translate($this->sourceLanguage['code'], $value, $targetLanguageCode);
         $resultText = $result->data->translations[0]->text;
 
         return $resultText;
@@ -142,14 +162,22 @@ class ProcessTranslatePage extends Process implements Module {
 
     private function processTextField(Field $field, Page $page) {
         $fieldName = $field->name;
-        $value = $page->getLanguageValue($this->sourceLangPage, $fieldName);
-        // If field is empty or translation already exists und should not be overwritten, return
-        if (!$value || ($page->getLanguageValue($this->targetLangPage, $fieldName) != '' && !$this->overwriteExistingTranslation)) {
-            return;
+        $value = $page->getLanguageValue($this->sourceLanguage['page'], $fieldName);
+        $countField = false;
+
+        foreach ($this->targetLanguages as $targetLanguage) {
+            // If field is empty or translation already exists und should not be overwritten, return
+            if (!$value || ($page->getLanguageValue($targetLanguage['page'], $fieldName) != '' && !$this->overwriteExistingTranslation)) {
+                continue;
+            }
+            $result = $this->translate($value, $targetLanguage['code']);
+            $page->setLanguageValue($targetLanguage['page'], $fieldName, $result);
+            $countField = true;
         }
-        $result = $this->translate($value);
-        $page->setLanguageValue($this->targetLangPage, $fieldName, $result);
         $page->save($fieldName);
+        if ($countField) {
+            $this->translatedFieldsCount++;
+        }
     }
 
     private function processFileField(Field $field, Page $page) {
@@ -158,16 +186,24 @@ class ProcessTranslatePage extends Process implements Module {
         if (!$field->count()) {
             return;
         }
+        $countField = false;
 
         foreach ($field as $item) {
             $value = $item->description;
-            // If no description set or translated description already exists und should not be overwritten, continue
-            if (!$value || ($item->description($this->targetLangPage) != '' && !$this->overwriteExistingTranslation)) {
-                continue;
+
+            foreach ($this->targetLanguages as $targetLanguage) {
+                // If no description set or translated description already exists und should not be overwritten, continue
+                if (!$value || ($item->description($targetLanguage['page']) != '' && !$this->overwriteExistingTranslation)) {
+                    continue;
+                }
+                $result = $this->translate($value, $targetLanguage['code']);
+                $item->description($targetLanguage['page'], $result);
+                $countField = true;
             }
-            $result = $this->translate($value);
-            $item->description($this->targetLangPage, $result);
             $item->save();
+            if ($countField) {
+                $this->translatedFieldsCount++;
+            }
         }
     }
 
@@ -187,13 +223,21 @@ class ProcessTranslatePage extends Process implements Module {
             if (strpos($name, '.') === 0) {
                 continue;
             }
-            $enFieldName = $name.'.'.$this->targetLangPage->id;
-            // If translation already exists und should not be overwritten, continue
-            if ($page->$field->$enFieldName != '' && !$this->overwriteExistingTranslation) {
-                continue;
+            $countField = false;
+
+            foreach ($this->targetLanguages as $targetLanguage) {
+                $targetFieldName = $name.'.'.$targetLanguage['page']->id;
+                // If translation already exists und should not be overwritten, continue
+                if ($page->$field->$targetFieldName != '' && !$this->overwriteExistingTranslation) {
+                    continue;
+                }
+                $result = $this->translate($value, $targetLanguage['code']);
+                $page->$field->$targetFieldName = $result;
+                $countField = true;
             }
-            $result = $this->translate($value);
-            $page->$field->$enFieldName = $result;
+            if ($countField) {
+                $this->translatedFieldsCount++;
+            }
         }
         $page->save($field->name);
     }
