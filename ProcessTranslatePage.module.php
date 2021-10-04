@@ -69,7 +69,7 @@ class ProcessTranslatePage extends Process implements Module {
 
         // Let’s go!
         $this->processFields($page);
-        $this->message($this->translatedFieldsCount.__(' fields translated.'));
+        $this->message($this->translatedFieldsCount.' '.__('fields translated.'));
     }
 
     public function addDropdownOption($event) {
