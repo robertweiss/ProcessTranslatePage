@@ -109,10 +109,14 @@ class ProcessTranslatePage extends Process implements Module {
     }
 
     private function setLanguages() {
-        // 1022 is ID of default language
+        $defaultLanguage = $this->languages->get('default');
+        $defaultLanguageId = $defaultLanguage->id;
+        if (!$this->fluency->data['pw_language_'.$defaultLanguageId]) {
+            $this->error(__('Fluency is not setup correctly. Please set source and target language(s) first.'));
+        }
         $this->sourceLanguage = [
-            'page' => $this->languages->get(1022),
-            'code' => $this->fluency->data['pw_language_1022'],
+            'page' => $defaultLanguage,
+            'code' => $this->fluency->data['pw_language_'.$defaultLanguageId],
         ];
 
         foreach ($this->fluency->data as $key => $data) {
