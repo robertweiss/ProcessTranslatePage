@@ -14,6 +14,8 @@ As translations might take some time to proceed, PHP timeouts might occur on pag
 
 ### Settings
 - Exclude Templates
+- Exclude Fields
+- Exclude Target Languages
 - Overwrite existing translations
 
 ### Field support
