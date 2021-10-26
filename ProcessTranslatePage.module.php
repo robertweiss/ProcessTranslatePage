@@ -9,6 +9,8 @@ class ProcessTranslatePage extends Process implements Module {
     private $sourceLanguage;
     private $targetLanguages = [];
     private $excludedTemplates = [];
+    private $excludedFields = [];
+    private $excludedLangauges = [];
     private $adminTemplates = ['admin', 'language', 'user', 'permission', 'role'];
     private $overwriteExistingTranslation;
     private $translatedFieldsCount = 0;
@@ -44,6 +46,8 @@ class ProcessTranslatePage extends Process implements Module {
     public function initSettings() {
         // Set (user-)settings
         $this->excludedTemplates = $this->get('excludedTemplates');
+        $this->excludedFields = $this->get('excludedFields');
+        $this->excludedLanguages = $this->get('excludedLanguages');
         $this->overwriteExistingTranslation = !!$this->get('overwriteExistingTranslation');
         $this->throttleSave = 5;
 
@@ -124,8 +128,16 @@ class ProcessTranslatePage extends Process implements Module {
             if (strpos($key, 'pw_language_') !== 0 || $key === 'pw_language_1022') {
                 continue;
             }
+
+            $languagePage = $this->languages->get(str_replace('pw_language_', '', $key));
+
+            // Ignore languages which are set as excluded in user settings
+            if (in_array($languagePage->name, $this->excludedLanguages)) {
+                continue;
+            }
+
             $this->targetLanguages[] = [
-                'page' => $this->languages->get(str_replace('pw_language_', '', $key)),
+                'page' => $languagePage,
                 'code' => $data,
             ];
         }
@@ -150,6 +162,11 @@ class ProcessTranslatePage extends Process implements Module {
         }
 
         foreach ($fields as $field) {
+            // Ignore fields that are set as excluded in user settings
+            if (in_array($field->name, $this->excludedFields)) {
+                continue;
+            }
+
             // e.g. Processwire/FieldtypePageTitleLanguage -> PageTitleLanguage
             $shortType = str_replace('ProcessWire/', '', $field->type);
             $shortType = str_replace('Fieldtype', '', $shortType);

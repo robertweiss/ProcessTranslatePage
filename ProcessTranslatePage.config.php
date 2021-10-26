@@ -6,7 +6,29 @@ if (wire('templates')) {
         if ($template->flags && $template->flags === Template::flagSystem) {
             continue;
         }
-        $excludedTemplatesOptions[$template->name] = $template->get('label|name');
+        $label = $template->label ? $template->label . ' (' . $template->name . ')' : $template->name;
+        $excludedTemplatesOptions[$template->name] = $label;
+    }
+}
+
+$excludedFieldsOptions = [];
+if (wire('fields')) {
+    foreach (wire('fields') as $field) {
+        if ($field->flags && $field->flags === Field::flagSystem) {
+            continue;
+        }
+        $label = $field->label ? $field->label . ' (' . $field->name . ')' : $field->name;
+        $excludedFieldsOptions[$field->name] = $label;
+    }
+}
+
+$excludedLanguagesOptions = [];
+if (wire('languages')) {
+    foreach (wire('languages') as $language) {
+        if ($language->name === 'default') {
+            continue;
+        }
+        $excludedLanguagesOptions[$language->name] = $language->get('title|name');
     }
 }
 
@@ -16,7 +38,7 @@ $config = [
 		'label' => __('Overwrite existing translations'),
 		'description' => __('If checked, all existing target language fields are overwritten on save. Otherwise, only empty fields are filled.'),
 		'value' => false,
-        'columnWidth' => 50
+        'columnWidth' => 100
 	],
 
     'excludedTemplates' => [
@@ -25,7 +47,24 @@ $config = [
 		'description' => __('Pages with these templates will not display the save + translate option in the save dropdown'),
         'options' => $excludedTemplatesOptions,
 		'value' => [],
-        'columnWidth' => 50
+        'columnWidth' => 33
 	],
 
+    'excludedFields' => [
+		'type' => 'asmSelect',
+		'label' => __('Excluded Fields'),
+		'description' => __('Fields that will be ignored when translating'),
+        'options' => $excludedFieldsOptions,
+		'value' => [],
+        'columnWidth' => 33
+	],
+
+    'excludedLanguages' => [
+		'type' => 'asmSelect',
+		'label' => __('Excluded Languages'),
+		'description' => __('Target languages that will be ignored when translating'),
+        'options' => $excludedLanguagesOptions,
+		'value' => [],
+        'columnWidth' => 34
+	],
 ];
