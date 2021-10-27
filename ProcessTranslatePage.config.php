@@ -38,7 +38,15 @@ $config = [
 		'label' => __('Overwrite existing translations'),
 		'description' => __('If checked, all existing target language fields are overwritten on save. Otherwise, only empty fields are filled.'),
 		'value' => false,
-        'columnWidth' => 100
+        'columnWidth' => 50
+	],
+
+    'showSingleTargetLanguageButtons' => [
+		'type' => 'checkbox',
+		'label' => __('Show single target language buttons'),
+		'description' => __('If checked, the save dropdown will add one button for each allowed target language instead of one button for all languages combined.'),
+		'value' => false,
+        'columnWidth' => 50
 	],
 
     'excludedTemplates' => [

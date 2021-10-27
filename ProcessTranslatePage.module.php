@@ -13,6 +13,7 @@ class ProcessTranslatePage extends Process implements Module {
     private $excludedLangauges = [];
     private $adminTemplates = ['admin', 'language', 'user', 'permission', 'role'];
     private $overwriteExistingTranslation;
+    private $showSingleTargetLanguageButtons;
     private $translatedFieldsCount = 0;
 
     private $textFieldTypes = [
@@ -36,9 +37,9 @@ class ProcessTranslatePage extends Process implements Module {
             return;
         }
 
+        $this->initSettings();
         $this->addHookAfter("ProcessPageEdit::getSubmitActions", $this, "addDropdownOption");
         $this->addHookAfter("Pages::saved", $this, "hookPageSave");
-        $this->initSettings();
 
         parent::init();
     }
@@ -49,6 +50,7 @@ class ProcessTranslatePage extends Process implements Module {
         $this->excludedFields = $this->get('excludedFields');
         $this->excludedLanguages = $this->get('excludedLanguages');
         $this->overwriteExistingTranslation = !!$this->get('overwriteExistingTranslation');
+        $this->showSingleTargetLanguageButtons = !!$this->get('showSingleTargetLanguageButtons');
         $this->throttleSave = 5;
 
         $this->fluency = $this->modules->get('Fluency');
@@ -60,8 +62,20 @@ class ProcessTranslatePage extends Process implements Module {
         $page = $event->arguments("page");
 
         // Only start translating if post variable is set
-        if ($this->input->post->_after_submit_action != 'save_and_translate') {
+        if (strpos($this->input->post->_after_submit_action, 'save_and_translate') !== 0) {
             return;
+        }
+
+        // Check if post variable has an appended single target language code
+        if ($this->input->post->_after_submit_action !== 'save_and_translate') {
+
+            // Selected target language is the last part of the post variable
+            $singleTargetLanguage = str_replace('save_and_translate_', '', $this->input->post->_after_submit_action);
+
+            // Filter all allowed target languages for the selected language name
+            $this->targetLanguages = array_filter($this->targetLanguages, function ($targetLanguage) use ($singleTargetLanguage) {
+                return $targetLanguage['page']->name === $singleTargetLanguage;
+            });
         }
 
         // Throttle translations (only triggers every after a set amount of time)
@@ -86,11 +100,26 @@ class ProcessTranslatePage extends Process implements Module {
         }
 
         $actions = $event->return;
-        $actions[] = [
-            'value' => 'save_and_translate',
-            'icon' => 'language',
-            'label' => __('Save + Translate'),
-        ];
+
+        // If single buttons are set, add one button for each target language
+        if ($this->showSingleTargetLanguageButtons) {
+            foreach ($this->targetLanguages as $targetLanguage) {
+                $label = __('Save + Translate to');
+                $actions[] = [
+                    'value' => 'save_and_translate_' . $targetLanguage['page']->name,
+                    'icon' => 'language',
+                    'label' => $label . ' ' . $targetLanguage['page']->get('title|name'),
+                ];
+            }
+        // Else add only one button to translate to all target languages
+        } else {
+            $actions[] = [
+                'value' => 'save_and_translate',
+                'icon' => 'language',
+                'label' => __('Save + Translate'),
+            ];
+        }
+
         $event->return = $actions;
     }
 
