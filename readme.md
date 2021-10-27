@@ -16,7 +16,8 @@ As translations might take some time to proceed, PHP timeouts might occur on pag
 - Exclude Templates
 - Exclude Fields
 - Exclude Target Languages
-- Overwrite existing translations
+- Overwrite Existing Translations
+- Show Single Target Language Buttons
 
 ### Field support
 - PageTitleLanguage
