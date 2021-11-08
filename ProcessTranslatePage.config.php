@@ -1,5 +1,12 @@
 <?php namespace ProcessWire;
 
+$sourceLanguageOptions = [];
+if (wire('languages')) {
+    foreach (wire('languages') as $language) {
+        $sourceLanguageOptions[$language->name] = $language->get('title|name');
+    }
+}
+
 $excludedTemplatesOptions = [];
 if (wire('templates')) {
     foreach (wire('templates') as $template) {
@@ -33,12 +40,21 @@ if (wire('languages')) {
 }
 
 $config = [
+    'sourceLanguage' => [
+		'type' => 'select',
+		'label' => __('Source Language'),
+		'description' => __('The language which will be used to translate from. If no selection is made, the default language will be used'),
+        'options' => $sourceLanguageOptions,
+		'value' => [],
+        'columnWidth' => 33
+	],
+
 	'overwriteExistingTranslation' => [
 		'type' => 'checkbox',
 		'label' => __('Overwrite existing translations'),
 		'description' => __('If checked, all existing target language fields are overwritten on save. Otherwise, only empty fields are filled.'),
 		'value' => false,
-        'columnWidth' => 50
+        'columnWidth' => 33
 	],
 
     'showSingleTargetLanguageButtons' => [
@@ -46,7 +62,7 @@ $config = [
 		'label' => __('Show single target language buttons'),
 		'description' => __('If checked, the save dropdown will add one button for each allowed target language instead of one button for all languages combined.'),
 		'value' => false,
-        'columnWidth' => 50
+        'columnWidth' => 34
 	],
 
     'excludedTemplates' => [

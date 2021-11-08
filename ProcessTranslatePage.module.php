@@ -46,6 +46,7 @@ class ProcessTranslatePage extends Process implements Module {
 
     public function initSettings() {
         // Set (user-)settings
+        $this->sourceLanguage = $this->get('sourceLanguage');
         $this->excludedTemplates = $this->get('excludedTemplates');
         $this->excludedFields = $this->get('excludedFields');
         $this->excludedLanguages = $this->get('excludedLanguages');
@@ -154,7 +155,7 @@ class ProcessTranslatePage extends Process implements Module {
 
         foreach ($this->fluency->data as $key => $data) {
             // Ignore non language keys and default language key
-            if (strpos($key, 'pw_language_') !== 0 || $key === 'pw_language_1022') {
+            if (strpos($key, 'pw_language_') !== 0 || $key === 'pw_language_'.$defaultLanguageId) {
                 continue;
             }
 
