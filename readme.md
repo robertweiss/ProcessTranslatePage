@@ -13,6 +13,7 @@ As translations might take some time to proceed, PHP timeouts might occur on pag
 6. Open a page, click on the arrow next to the save-button, choose ›Save + Translate‹
 
 ### Settings
+- Source Language
 - Exclude Templates
 - Exclude Fields
 - Exclude Target Languages
