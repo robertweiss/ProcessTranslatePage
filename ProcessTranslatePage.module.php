@@ -102,14 +102,16 @@ class ProcessTranslatePage extends Process implements Module {
 
         $actions = $event->return;
 
+        $label = "%s + " . __('Translate');
+
         // If single buttons are set, add one button for each target language
         if ($this->showSingleTargetLanguageButtons) {
             foreach ($this->targetLanguages as $targetLanguage) {
-                $label = __('Save + Translate to');
+
                 $actions[] = [
                     'value' => 'save_and_translate_' . $targetLanguage['page']->name,
                     'icon' => 'language',
-                    'label' => $label . ' ' . $targetLanguage['page']->get('title|name'),
+                    'label' => $label . ': ' . $this->sourceLanguage['page']->get('title|name') . ' &rarr; ' . $targetLanguage['page']->get('title|name'),
                 ];
             }
         // Else add only one button to translate to all target languages
@@ -117,7 +119,7 @@ class ProcessTranslatePage extends Process implements Module {
             $actions[] = [
                 'value' => 'save_and_translate',
                 'icon' => 'language',
-                'label' => __('Save + Translate'),
+                'label' => $label,
             ];
         }
 
@@ -142,34 +144,48 @@ class ProcessTranslatePage extends Process implements Module {
         }
     }
 
-    private function setLanguages() {
-        $defaultLanguage = $this->languages->get('default');
-        $defaultLanguageId = $defaultLanguage->id;
-        if (!$this->fluency->data['pw_language_'.$defaultLanguageId]) {
-            $this->error(__('Fluency is not setup correctly. Please set source and target language(s) first.'));
-        }
-        $this->sourceLanguage = [
-            'page' => $defaultLanguage,
-            'code' => $this->fluency->data['pw_language_'.$defaultLanguageId],
-        ];
-
-        foreach ($this->fluency->data as $key => $data) {
-            // Ignore non language keys and default language key
-            if (strpos($key, 'pw_language_') !== 0 || $key === 'pw_language_'.$defaultLanguageId) {
+    public static function getAvailableLanguages() {
+        $fluency = wire('modules')->get('Fluency');
+        $availableLanguages = [];
+        foreach ($fluency->data as $key => $data) {
+            // Ignore non language keys
+            if (strpos($key, 'pw_language_') !== 0) {
                 continue;
             }
 
-            $languagePage = $this->languages->get(str_replace('pw_language_', '', $key));
-
-            // Ignore languages which are set as excluded in user settings
-            if (in_array($languagePage->name, $this->excludedLanguages)) {
-                continue;
-            }
-
-            $this->targetLanguages[] = [
+            $languagePage = wire('languages')->get(str_replace('pw_language_', '', $key));
+            $availableLanguages[] = [
                 'page' => $languagePage,
-                'code' => $data,
+                'code' => $data
             ];
+        }
+
+        return $availableLanguages;
+    }
+
+    private function setLanguages() {
+        $availableLanguages = $this->getAvailableLanguages();
+
+        $sourceLanguageName = $this->sourceLanguage ?: 'default';
+
+        foreach ($availableLanguages as $language) {
+            if ($language['page']->name == $sourceLanguageName) {
+                $this->sourceLanguage = $language;
+
+                // Special case source languages: Fluency only allows EN or PT, but not EN-GB or PT-BR as source
+                // so we remove the part after the - (if present)
+                $this->sourceLanguage['code'] = explode('-', $this->sourceLanguage['code'])[0];
+                break;
+            }
+        }
+
+        foreach ($availableLanguages as $language) {
+            // Ignore languages which are set as excluded or source in user settings
+            if (in_array($language['page']->name, $this->excludedLanguages) || $language['page']->name == $this->sourceLanguage['page']->name) {
+                continue;
+            }
+
+            $this->targetLanguages[] = $language;
         }
     }
 
