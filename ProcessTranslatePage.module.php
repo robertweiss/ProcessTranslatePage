@@ -174,7 +174,8 @@ class ProcessTranslatePage extends Process implements Module {
 
                 // Special case source languages: Fluency only allows EN or PT, but not EN-GB or PT-BR as source
                 // so we remove the part after the - (if present)
-                $this->sourceLanguage['code'] = explode('-', $this->sourceLanguage['code'])[0];
+                $code = explode('-', $this->sourceLanguage['code'])[0];
+                $this->sourceLanguage['code'] = $code;
                 break;
             }
         }
