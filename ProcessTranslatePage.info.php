@@ -3,7 +3,7 @@
 $info = array(
 	'title' => 'TranslatePage (via Fluency)',
 	'summary' => 'Translates all textfields on a page via Fluency',
-	'version' => 6,
+	'version' => 7,
 	'author' => 'Robert Weiss',
 	'icon' => 'language',
 	'requires' => 'Fluency',
