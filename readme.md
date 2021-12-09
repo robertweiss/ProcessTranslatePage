@@ -17,8 +17,13 @@ As translations might take some time to proceed, PHP timeouts might occur on pag
 - Exclude Templates
 - Exclude Fields
 - Exclude Target Languages
-- Overwrite Existing Translations
 - Show Single Target Language Buttons
+- Write Mode
+  - Translate only if target field is empty
+  - Translate only changed fields
+  - Overwrite all target fields
+
+Caution: the »Changed fields«-option support is currently only one level deep. If you change any value inside a Repeater(-Matrix) or FieldsetPage field, the complete field will be translated.
 
 ### Field support
 - PageTitleLanguage
