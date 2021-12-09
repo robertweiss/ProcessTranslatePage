@@ -12,9 +12,10 @@ class ProcessTranslatePage extends Process implements Module {
     private $excludedFields = [];
     private $excludedLangauges = [];
     private $adminTemplates = ['admin', 'language', 'user', 'permission', 'role'];
-    private $overwriteExistingTranslation;
+    private $writemode;
     private $showSingleTargetLanguageButtons;
     private $translatedFieldsCount = 0;
+    private $changedFields = [];
 
     private $textFieldTypes = [
         'PageTitleLanguage',
@@ -50,7 +51,7 @@ class ProcessTranslatePage extends Process implements Module {
         $this->excludedTemplates = $this->get('excludedTemplates');
         $this->excludedFields = $this->get('excludedFields');
         $this->excludedLanguages = $this->get('excludedLanguages');
-        $this->overwriteExistingTranslation = !!$this->get('overwriteExistingTranslation');
+        $this->writemode = $this->get('writemode');
         $this->showSingleTargetLanguageButtons = !!$this->get('showSingleTargetLanguageButtons');
         $this->throttleSave = 5;
 
@@ -60,7 +61,9 @@ class ProcessTranslatePage extends Process implements Module {
 
     public function hookPageSave($event) {
         /** @var Page $page */
-        $page = $event->arguments("page");
+        $page = $event->arguments('page');
+        // We need the changed field names as a simple array
+        $this->changedFields = array_values($event->arguments(1));
 
         // Only start translating if post variable is set
         if (strpos($this->input->post->_after_submit_action, 'save_and_translate') !== 0) {
@@ -130,7 +133,7 @@ class ProcessTranslatePage extends Process implements Module {
         $this->initSettings();
         // Only process page if template is valid
         if (!in_array($page->template->name, array_merge($this->adminTemplates, $this->excludedTemplates))) {
-            $this->processFields($page);
+            $this->processFields($page, false);
             echo "Process page {$page->title} ($page->id)\n";
         } else {
             echo "Ignore page {$page->title} ($page->id)\n";
@@ -200,7 +203,7 @@ class ProcessTranslatePage extends Process implements Module {
         return $resultText;
     }
 
-    private function processFields($page) {
+    private function processFields($page, $isPageWhichSaveWasHookedOn = true) {
         $page->of(false);
         $fields = $page->template->fields;
 
@@ -212,6 +215,14 @@ class ProcessTranslatePage extends Process implements Module {
             // Ignore fields that are set as excluded in user settings
             if (in_array($field->name, $this->excludedFields)) {
                 continue;
+            }
+
+            // If only changed fields should be translated, check if we process the hooked page
+            // Changes are only listed for the hooked page itself atm, not for ›subpages‹ (repeater, fieldsetpage e.g.)
+            if ($this->writemode == 'changed' && $isPageWhichSaveWasHookedOn) {
+                if (!in_array($field->name, $this->changedFields)) {
+                    continue;
+                }
             }
 
             // e.g. Processwire/FieldtypePageTitleLanguage -> PageTitleLanguage
@@ -256,8 +267,8 @@ class ProcessTranslatePage extends Process implements Module {
         $countField = false;
 
         foreach ($this->targetLanguages as $targetLanguage) {
-            // If field is empty or translation already exists und should not be overwritten, return
-            if (!$value || ($page->getLanguageValue($targetLanguage['page'], $fieldName) != '' && !$this->overwriteExistingTranslation)) {
+            // If field is empty or translation already exists and should not be overwritten, return
+            if (!$value || ($page->getLanguageValue($targetLanguage['page'], $fieldName) != '' && $this->writemode == 'empty')) {
                 continue;
             }
             $result = $this->translate($value, $targetLanguage['code']);
@@ -283,8 +294,8 @@ class ProcessTranslatePage extends Process implements Module {
             $value = $item->description;
 
             foreach ($this->targetLanguages as $targetLanguage) {
-                // If no description set or translated description already exists und should not be overwritten, continue
-                if (!$value || ($item->description($targetLanguage['page']) != '' && !$this->overwriteExistingTranslation)) {
+                // If no description set or translated description already exists and should not be overwritten, continue
+                if (!$value || ($item->description($targetLanguage['page']) != '' && $this->writemode == 'empty')) {
                     continue;
                 }
                 $result = $this->translate($value, $targetLanguage['code']);
@@ -300,12 +311,12 @@ class ProcessTranslatePage extends Process implements Module {
 
     private function processRepeaterField(RepeaterField $field, Page $page) {
         foreach ($page->$field as $item) {
-            $this->processFields($item);
+            $this->processFields($item, false);
         }
     }
 
     private function processFieldsetPage(Field $field, Page $page) {
-        $this->processFields($page->$field);
+        $this->processFields($page->$field, false);
     }
 
     private function processFunctionalField(Field $field, Page $page) {
@@ -318,8 +329,8 @@ class ProcessTranslatePage extends Process implements Module {
 
             foreach ($this->targetLanguages as $targetLanguage) {
                 $targetFieldName = $name.'.'.$targetLanguage['page']->id;
-                // If translation already exists und should not be overwritten, continue
-                if ($page->$field->$targetFieldName != '' && !$this->overwriteExistingTranslation) {
+                // If translation already exists and should not be overwritten, continue
+                if ($page->$field->$targetFieldName != '' && $this->writemode == 'empty') {
                     continue;
                 }
                 $result = $this->translate($value, $targetLanguage['code']);
@@ -345,8 +356,8 @@ class ProcessTranslatePage extends Process implements Module {
                     $countField = false;
 
                     foreach ($this->targetLanguages as $targetLanguage) {
-                        // If field is empty or translation already exists und should not be overwritten, return
-                        if (!$value || ($item->getLanguageValue($targetLanguage['page']) != '' && !$this->overwriteExistingTranslation)) {
+                        // If field is empty or translation already exists and should not be overwritten, return
+                        if (!$value || ($item->getLanguageValue($targetLanguage['page']) != '' && $this->writemode == 'empty')) {
                             continue;
                         }
                         $result = $this->translate($value, $targetLanguage['code']);

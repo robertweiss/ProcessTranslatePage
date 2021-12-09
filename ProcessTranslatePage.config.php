@@ -22,7 +22,7 @@ class ProcessTranslatePageConfig extends ModuleConfig {
             'excludedTemplates' => [],
             'excludedFields' => [],
             'excludedLanguages' => [],
-            'overwriteExistingTranslation' => false,
+            'writemode' => 'empty',
             'showSingleTargetLanguageButtons' => false,
         ];
     }
@@ -78,16 +78,20 @@ class ProcessTranslatePageConfig extends ModuleConfig {
                 'description' => $this->_('The language which will be used to translate from. If no selection is made, the default language will be used'),
                 'notes' => $this->_('Languages need to be defined in Fluency config first'),
                 'options' => $this->getLanguageOptions(),
-                'value' => [],
                 'columnWidth' => 33,
             ])
         );
 
         $inputfields->add(
-            $this->buildInputField('InputfieldCheckbox', [
-                'name+id' => 'overwriteExistingTranslation',
-                'label' => $this->_('Overwrite existing translations'),
-                'description' => $this->_('If checked, all existing target language fields are overwritten on save. Otherwise, only empty fields are filled.'),
+            $this->buildInputField('InputfieldRadios', [
+                'name+id' => 'writemode',
+                'label' => $this->_('Write mode'),
+                'notes' => $this->_('Caution: the »Changed fields« option support is currently only one level deep. If you change any value inside a Repeater (Matrix) or FieldsetPage field, the complete field will be translated'),
+                'options' => [
+                    'empty' => $this->_('Translate only if target field is empty'),
+                    'changed' => $this->_('Translate only changed fields'),
+                    'all' => $this->_('Overwrite all target fields'),
+                ],
                 'columnWidth' => 33,
             ])
         );
