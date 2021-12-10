@@ -10,5 +10,5 @@ $info = array(
 	'href' => 'https://github.com/robertweiss/ProcessTranslatePage',
 	'permission' => 'fluency-translate',
     'singular' => true,
-    'autoload' => true
+    'autoload' => 'template=admin'
 );
