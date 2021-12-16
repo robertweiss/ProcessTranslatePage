@@ -6,7 +6,10 @@ $info = array(
 	'version' => 7,
 	'author' => 'Robert Weiss',
 	'icon' => 'language',
-	'requires' => 'Fluency',
+    'requires' => [
+        'Fluency',
+        'ProcessWire>=3.0.184'
+    ],
 	'href' => 'https://github.com/robertweiss/ProcessTranslatePage',
 	'permission' => 'fluency-translate',
     'singular' => true,
