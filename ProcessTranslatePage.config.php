@@ -18,7 +18,7 @@ class ProcessTranslatePageConfig extends ModuleConfig {
 
     public function getDefaults() {
         return [
-            'sourceLanguage' => wire('languages')->get('default'),
+            'sourceLanguage' => wire('languages')->get('default')->name,
             'excludedTemplates' => [],
             'excludedFields' => [],
             'excludedLanguages' => [],
