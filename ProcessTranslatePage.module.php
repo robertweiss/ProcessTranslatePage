@@ -134,16 +134,16 @@ class ProcessTranslatePage extends Process implements Module {
         // Only process page if template is valid
         if (!in_array($page->template->name, array_merge($this->adminTemplates, $this->excludedTemplates))) {
             $this->processFields($page, false);
-            echo "Process page {$page->title} ($page->id)\n";
+            echo "Process page {$page->title} ({$page->id})\n";
         } else {
-            echo "Ignore page {$page->title} ($page->id)\n";
+            echo "Ignore page {$page->title} ({$page->id})\n";
         }
 
         $selector = ($includeHidden) ? 'include=hidden' : '';
 
         // Iterate through all children and process them recursively
         foreach ($page->children($selector) as $item) {
-            $this->translatePageTree($item);
+            $this->translatePageTree($item, $includeHidden);
         }
     }
 
@@ -167,7 +167,7 @@ class ProcessTranslatePage extends Process implements Module {
     }
 
     private function setLanguages() {
-        $availableLanguages = $this->getAvailableLanguages();
+        $availableLanguages = self::getAvailableLanguages();
 
         $sourceLanguageName = $this->sourceLanguage ?: 'default';
 
