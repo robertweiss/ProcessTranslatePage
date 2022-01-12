@@ -309,7 +309,7 @@ class ProcessTranslatePage extends Process implements Module {
         }
     }
 
-    private function processRepeaterField(RepeaterField $field, Page $page) {
+    private function processRepeaterField($field, Page $page) {
         foreach ($page->$field as $item) {
             $this->processFields($item, false);
         }
