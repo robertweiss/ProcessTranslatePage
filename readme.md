@@ -30,9 +30,10 @@ Caution: the »Changed fields«-option support is currently only one level deep.
 - TextLanguage
 - TextareaLanguage
 - File (and image) descriptions
-- All the mentioned fields inside Repeater, RepeaterMatrix, FieldsetPage, Functional and Table fields
+- Combo (ProField)
+- All the mentioned fields inside Repeater, RepeaterMatrix, FieldsetPage, Functional and Table fields (ProFields)
 
 ### Command line usage
 If you want to translate more than one page at time, you can execute the included script ```translate-pagetree.php``` in the command line to prevent timeouts. Before executing, change the variables ```$username```, ```$home``` and ```$includeHidden``` in the script according to your needs.
 
-**Please note, this is an alpha release.** Please use in production after thorough testing for your own project and create Github issues for bugs found if possible.
+**Please note, this is a beta release.** Please use in production after thorough testing for your own project and create Github issues for bugs found if possible.
