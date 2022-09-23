@@ -258,6 +258,11 @@ class ProcessTranslatePage extends Process implements Module {
                 $this->processTableField($field, $page);
                 continue;
             }
+
+            if ($shortType == 'Combo') {
+                $this->processComboFields($field, $page);
+                continue;
+            }
         }
     }
 
@@ -372,5 +377,36 @@ class ProcessTranslatePage extends Process implements Module {
             }
         }
         $page->save($fieldName);
+    }
+
+    private function processComboFields(Field $field, Page $page) {
+        $comboFieldsName = $field->name;
+        foreach ($page->$field as $comboFieldName => $comboField) {
+            if (get_class($comboField) !== 'ProcessWire\ComboLanguagesValue') {
+                continue;
+            }
+
+            $this->processComboField($comboField, $comboFieldName, $comboFieldsName, $page);
+        }
+    }
+
+    private function processComboField(ComboLanguagesValue $comboField, String $comboFieldName, String $comboFieldsName, Page $page) {
+        $value = $page->$comboFieldsName->$comboFieldName->getLanguageValue($this->sourceLanguage['page']);
+        $countField = false;
+
+        foreach ($this->targetLanguages as $targetLanguage) {
+            // If field is empty or translation already exists and should not be overwritten, return
+            if (!$value || ($page->$comboFieldsName->$comboFieldName->getLanguageValue($targetLanguage['page']) != '' && $this->writemode == 'empty')) {
+                continue;
+            }
+            $result = $this->translate($value, $targetLanguage['code']);
+            $page->$comboFieldsName->$comboFieldName->setLanguageValue($targetLanguage['page'], $result);
+            $countField = true;
+        }
+
+        $page->save($comboFieldsName);
+        if ($countField) {
+            $this->translatedFieldsCount++;
+        }
     }
 }
