@@ -66,7 +66,7 @@ class ProcessTranslatePage extends Process implements Module {
         $this->changedFields = array_values($event->arguments(1));
 
         // Only start translating if post variable is set
-        if (strpos($this->input->post->_after_submit_action, 'save_and_translate') !== 0) {
+        if ($this->input->post->_after_submit_action && strpos($this->input->post->_after_submit_action, 'save_and_translate') !== 0) {
             return;
         }
 
