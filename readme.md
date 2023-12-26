@@ -1,11 +1,11 @@
 # ProcessTranslatePage – A Processwire module to translate all page fields via Fluency
 
-ProcessTranslatePage is an extension for the Processwire module [Fluency by SkyLundy](https://github.com/SkyLundy/Fluency-Translation) so it can translate all text fields on a page at once. 
+ProcessTranslatePage is an extension for the Processwire module [Fluency by SkyLundy](https://github.com/SkyLundy/Fluency) so it can translate all text fields on a page at once.
 
 As translations might take some time to proceed, PHP timeouts might occur on pages with a lot of fields and/or text. To bypass that, see the section [Command line usage](#command-line-usage)
 
 ### Installation
-1. Download and install [Fluency-Translation](https://github.com/SkyLundy/Fluency-Translation)
+1. Download and install [Fluency-Translation](https://github.com/SkyLundy/Fluency)
 2. Configure the DeepL-API credentials and language settings
 3. Download and install [ProcessTranslatePage](https://github.com/robertweiss/ProcessTranslatePage)
 4. Configure the module settings if needed
