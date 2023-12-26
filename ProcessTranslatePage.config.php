@@ -18,7 +18,7 @@ class ProcessTranslatePageConfig extends ModuleConfig {
 
     public function getDefaults() {
         return [
-            'sourceLanguage' => wire('languages')->get('default')->name,
+            'sourceLanguage' => wire('languages')->get('default')->id,
             'excludedTemplates' => [],
             'excludedFields' => [],
             'excludedLanguages' => [],
@@ -28,14 +28,13 @@ class ProcessTranslatePageConfig extends ModuleConfig {
     }
 
     private function getLanguageOptions() {
-        $processTranslatePage = wire('modules')->get('ProcessTranslatePage');
-        $availableLanguages = $processTranslatePage::getAvailableLanguages();
-        $languageOptions = [];
-        foreach ($availableLanguages as $language) {
-            $languageOptions[$language['page']->name] = (string) $language['page']->get('title|name');
-        }
+        $configuredLanguages = wire('modules')->get('Fluency')->getConfiguredLanguages()->languages;
 
-        return $languageOptions;
+        return array_reduce($configuredLanguages, function($options, $language) {
+            $options[$language->id] = $language->title;
+
+            return $options;
+        }, []);
     }
 
     private function getTemplateOptions() {
