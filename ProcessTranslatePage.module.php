@@ -139,7 +139,7 @@ class ProcessTranslatePage extends Process implements Module {
             echo "Ignore page {$page->title} ({$page->id})\n";
         }
 
-        $selector = ($includeHidden) ? 'include=hidden' : '';
+        $selector = ($includeHidden) ? 'include=all' : '';
 
         // Iterate through all children and process them recursively
         foreach ($page->children($selector) as $item) {
