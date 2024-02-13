@@ -198,6 +198,11 @@ class ProcessTranslatePage extends Process implements Module {
             return '';
         }
         $result = $this->fluency->translate($this->sourceLanguage['code'], $value, $targetLanguageCode);
+
+        if (!$result->data->translations) {
+            throw new WireException($result->data->message);
+        }
+
         $resultText = $result->data->translations[0]->text;
 
         return $resultText;
