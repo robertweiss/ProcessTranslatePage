@@ -131,10 +131,11 @@ class ProcessTranslatePage extends Process implements Module {
 
     public function translatePageTree(Page $page, bool $includeHidden = true) {
         $this->initSettings();
+        $this->translatedFieldsCount = 0;
         // Only process page if template is valid
         if (!in_array($page->template->name, array_merge($this->adminTemplates, $this->excludedTemplates))) {
             $this->processFields($page, false);
-            echo "Process page {$page->title} ({$page->id})\n";
+            echo "Process page {$page->title} ({$page->id}): {$this->translatedFieldsCount} fields\n";
         } else {
             echo "Ignore page {$page->title} ({$page->id})\n";
         }
@@ -193,7 +194,7 @@ class ProcessTranslatePage extends Process implements Module {
         }
     }
 
-    private function translate(string $value, string $targetLanguageCode): string {
+    private function translate(string $value, string $targetLanguageCode, string $fieldName, Page $page): string {
         if (!$targetLanguageCode) {
             return '';
         }
@@ -204,6 +205,14 @@ class ProcessTranslatePage extends Process implements Module {
         }
 
         $resultText = $result->data->translations[0]->text;
+
+//        ray()->table([
+//            'Page' => $page->id.' ('.$page->title.')',
+//            'Field' => $fieldName,
+//            'Lang' => $this->sourceLanguage['code'] . ' -> ' . $targetLanguageCode,
+//            'SourceVal' => sanitizer()->truncate($value),
+//            'TargetVal' => sanitizer()->truncate($resultText),
+//        ]);
 
         return $resultText;
     }
@@ -281,7 +290,7 @@ class ProcessTranslatePage extends Process implements Module {
             if (!$value || ($page->getLanguageValue($targetLanguage['page'], $fieldName) != '' && $this->writemode == 'empty')) {
                 continue;
             }
-            $result = $this->translate($value, $targetLanguage['code']);
+            $result = $this->translate($value, $targetLanguage['code'], $fieldName, $page);
             $page->setLanguageValue($targetLanguage['page'], $fieldName, $result);
             $countField = true;
         }
@@ -293,6 +302,7 @@ class ProcessTranslatePage extends Process implements Module {
     }
 
     private function processFileField(Field $field, Page $page) {
+        $ogField = $field;
         /** @var Field $field */
         $field = $page->$field;
         if (!$field->count()) {
@@ -308,7 +318,7 @@ class ProcessTranslatePage extends Process implements Module {
                 if (!$value || ($item->description($targetLanguage['page']) != '' && $this->writemode == 'empty')) {
                     continue;
                 }
-                $result = $this->translate($value, $targetLanguage['code']);
+                $result = $this->translate($value, $targetLanguage['code'], $ogField->name, $page);
                 $item->description($targetLanguage['page'], $result);
                 $countField = true;
             }
@@ -337,13 +347,26 @@ class ProcessTranslatePage extends Process implements Module {
             }
             $countField = false;
 
+            // Field has language id
+            // Only use it if source language is not default
+            if (str_contains($name, '.')) {
+                $parts = explode('.', $name);
+                $fieldBasename = $parts[0];
+                $fieldLangId = $parts[1] ?: null;
+
+                if ((!$fieldLangId && $this->sourceLanguage['page']->name !== 'default') || $fieldLangId !== $this->sourceLanguage['id']) {
+                    continue;
+                }
+            }
+
             foreach ($this->targetLanguages as $targetLanguage) {
-                $targetFieldName = $name.'.'.$targetLanguage['page']->id;
+                // Only add dot notated language id to fieldname if it is not the default language
+                $targetFieldName = ($targetLanguage['page']->name !== 'default') ? $name.'.'.$targetLanguage['page']->id : $name;
                 // If translation already exists and should not be overwritten, continue
                 if ($page->$field->$targetFieldName != '' && $this->writemode == 'empty') {
                     continue;
                 }
-                $result = $this->translate($value, $targetLanguage['code']);
+                $result = $this->translate($value, $targetLanguage['code'], $name, $page);
                 $page->$field->$targetFieldName = $result;
                 $countField = true;
             }
@@ -370,7 +393,7 @@ class ProcessTranslatePage extends Process implements Module {
                         if (!$value || ($item->getLanguageValue($targetLanguage['page']) != '' && $this->writemode == 'empty')) {
                             continue;
                         }
-                        $result = $this->translate($value, $targetLanguage['code']);
+                        $result = $this->translate($value, $targetLanguage['code'], $fieldName, $page);
                         $item->setLanguageValue($targetLanguage['page'], $result);
                         $countField = true;
                     }
@@ -404,7 +427,7 @@ class ProcessTranslatePage extends Process implements Module {
             if (!$value || ($page->$comboFieldsName->$comboFieldName->getLanguageValue($targetLanguage['page']) != '' && $this->writemode == 'empty')) {
                 continue;
             }
-            $result = $this->translate($value, $targetLanguage['code']);
+            $result = $this->translate($value, $targetLanguage['code'], $comboFieldsName . ' -> ' . $comboFieldName, $page);
             $page->$comboFieldsName->$comboFieldName->setLanguageValue($targetLanguage['page'], $result);
             $countField = true;
         }
