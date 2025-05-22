@@ -18,7 +18,9 @@ class ProcessTranslatePageConfig extends ModuleConfig {
 
     public function getDefaults() {
         return [
-            'sourceLanguage' => wire('languages')->get('default')->name,
+            'deepLApiKey' => '',
+            'deepLGlossaryId' => '',
+            'sourceLanguage' => wire('languages')->get('default'),
             'excludedTemplates' => [],
             'excludedFields' => [],
             'excludedLanguages' => [],
@@ -28,11 +30,9 @@ class ProcessTranslatePageConfig extends ModuleConfig {
     }
 
     private function getLanguageOptions() {
-        $processTranslatePage = wire('modules')->get('ProcessTranslatePage');
-        $availableLanguages = $processTranslatePage::getAvailableLanguages();
         $languageOptions = [];
-        foreach ($availableLanguages as $language) {
-            $languageOptions[$language['page']->name] = (string) $language['page']->get('title|name');
+        foreach (wire('languages') as $language) {
+            $languageOptions[$language->name] = (string)$language->get('title|name');
         }
 
         return $languageOptions;
@@ -69,14 +69,63 @@ class ProcessTranslatePageConfig extends ModuleConfig {
     }
 
     public function getInputFields() {
+        $moduleConfig = $this->modules->getConfig('ProcessTranslatePage');
         $inputfields = parent::getInputfields();
+        $hasDeeplKey = isset($moduleConfig['deepLApiKey']) && $moduleConfig['deepLApiKey'] !== '';
+
+        $inputfields->add(
+            $this->buildInputField('InputfieldText', [
+                'name+id' => 'deepLApiKey',
+                'label' => $this->_('DeepL API Key'),
+                'description' => $this->_('A valid API key for DeepL. A DeepL developer account is need for this (https://www.deepl.com/pro/change-plan#developer)'),
+                'columnWidth' => $hasDeeplKey ? 50 : 100,
+            ])
+        );
+
+        if ($hasDeeplKey) {
+            $deepL = new \DeepL\Translator($moduleConfig['deepLApiKey']);
+            try {
+                $usage = $deepL->getUsage();
+                $count = number_format($usage->character->count, 0, '', '.');
+                $limit = number_format($usage->character->limit, 0, '', '.');
+                $percent = number_format($usage->character->count / $usage->character->limit * 100, 1, ',', '');
+                $deepLInfos = "{$count} of {$limit} characters used this month ({$percent}%).";
+
+                if ($usage->anyLimitReached()) {
+                    $deepLInfos .= ' <span class="uk-text-danger">Limit exceeded.</span>';
+                } else {
+                    $deepLInfos = '<span class="uk-text-primary">' . $deepLInfos . '</span>';
+                }
+            } catch (\DeepL\AuthorizationException $e) {
+                bd($e->getMessage());
+                $deepLInfos = '<span class="uk-text-danger">Authorization failed.</span>';
+            }
+
+            $inputfields->add(
+                $this->buildInputField('InputfieldMarkup', [
+                    'name+id' => 'deeplInfo',
+                    'label' => $this->_('DeepL usage infos'),
+                    'value' => $deepLInfos,
+                    'columnWidth' => 50,
+                ])
+            );
+
+            $inputfields->add(
+                $this->buildInputField('InputfieldText', [
+                    'name+id' => 'deepLGlossaryId',
+                    'label' => $this->_('DeepL Glossary ID'),
+                    'description' => $this->_('ID of DeepL glossary. Will be automatically set if glossary fields in languages are filled out.'),
+                    'collapsed' => Inputfield::collapsedYes,
+                    'columnWidth' => 100,
+                ])
+            );
+        }
 
         $inputfields->add(
             $this->buildInputField('InputfieldSelect', [
-                'name+id' => 'sourceLanguage',
+                'name+id' => 'sourceLanguageName',
                 'label' => $this->_('Source Language'),
                 'description' => $this->_('The language which will be used to translate from. If no selection is made, the default language will be used'),
-                'notes' => $this->_('Languages need to be defined in Fluency config first'),
                 'options' => $this->getLanguageOptions(),
                 'columnWidth' => 33,
             ])

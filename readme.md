@@ -1,18 +1,25 @@
-# ProcessTranslatePage – A Processwire module to translate all page fields via Fluency
+# ProcessTranslatePage – A Processwire Module for Effortless Page Translation
 
-ProcessTranslatePage is an extension for the Processwire module [Fluency by SkyLundy](https://github.com/SkyLundy/Fluency-Translation) so it can translate all text fields on a page at once. 
+Welcome to ProcessTranslatePage! This module is designed to help you translate all text fields on a page in Processwire with ease.
 
-As translations might take some time to proceed, PHP timeouts might occur on pages with a lot of fields and/or text. To bypass that, see the section [Command line usage](#command-line-usage)
+As translations might take some time to proceed, PHP timeouts might occur on pages with a lot of fields and/or text. To bypass that, please refer to the section [Command line usage](#command-line-usage)
+
+### Updating from 0.X to 1.0
+
+With the release of version 1.0, ProcessTranslatePage now connects directly to DeepL for translations, eliminating the need for the Fluency module. After updating, enter your existing Fluency API key in the settings and ensure you add locales for each language on their respective edit pages.
 
 ### Installation
-1. Download and install [Fluency-Translation](https://github.com/SkyLundy/Fluency-Translation)
-2. Configure the DeepL-API credentials and language settings
-3. Download and install [ProcessTranslatePage](https://github.com/robertweiss/ProcessTranslatePage)
-4. Configure the module settings if needed
-5. Add the permission ›fluency-translate‹ to your user role
-6. Open a page, click on the arrow next to the save-button, choose ›Save + Translate‹
+
+1. Download and install [ProcessTranslatePage](https://github.com/robertweiss/ProcessTranslatePage).
+2. Configure your DeepL API credentials and adjust the module settings as needed.
+3. Add locale information to your source and target language pages. You can find supported locales here: https://developers.deepl.com/docs/getting-started/supported-languages. If you wish to use glossaries, please add the relevant information to each language page. Note that the Free API plan supports only one multilanguage glossary.
+4. Assign the ›translate‹ permission to your user role.
+5. Open a page, click the arrow next to the save button, and select ›Save + Translate‹ to begin translating.
 
 ### Settings
+
+- DeepL API Key
+- DeepL Glossary ID (automatically set when using the glossary field in a language page)
 - Source Language
 - Exclude Templates
 - Exclude Fields
@@ -23,17 +30,20 @@ As translations might take some time to proceed, PHP timeouts might occur on pag
   - Translate only changed fields
   - Overwrite all target fields
 
-Caution: the »Changed fields«-option support is currently only one level deep. If you change any value inside a Repeater(-Matrix) or FieldsetPage field, the complete field will be translated.
+Please note: The ›Changed fields‹ option currently supports only one level deep. If you modify any value inside a Repeater(-Matrix) or FieldsetPage field, the entire field will be translated.
 
 ### Field support
+
 - PageTitleLanguage
 - TextLanguage
 - TextareaLanguage
 - File (and image) descriptions
 - Combo (ProField)
+- RockPageBuilder (3rd party)
 - All the mentioned fields inside Repeater, RepeaterMatrix, FieldsetPage, Functional and Table fields (ProFields)
 
 ### Command line usage
-If you want to translate more than one page at time, you can execute the included script ```translate-pagetree.php``` in the command line to prevent timeouts. Before executing, change the variables ```$username```, ```$home``` and ```$includeHidden``` in the script according to your needs.
 
-**Please note, this is a beta release.** Please use in production after thorough testing for your own project and create Github issues for bugs found if possible.
+For translating multiple pages simultaneously and avoiding timeouts, you can use the included script `translate-pagetree.php` from the command line. Before running the script, please update the variables `$username`, `$home`, and `$includeHidden` to suit your requirements.
+
+**Kindly note that this is a beta release.** Although it is successfully used in production for several of my clients, I recommend thorough testing before deploying it in your projects. If you encounter any bugs, please consider creating a GitHub issue to help me improve.

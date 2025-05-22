@@ -1,17 +1,16 @@
 <?php namespace ProcessWire;
 
 $info = array(
-	'title' => 'TranslatePage (via Fluency)',
-	'summary' => 'Translates all textfields on a page via Fluency',
-	'version' => 8,
+	'title' => 'TranslatePage (via DeepL)',
+	'summary' => 'Translates all textfields on a page via DeepL',
+	'version' => 10,
 	'author' => 'Robert Weiss',
 	'icon' => 'language',
     'requires' => [
-        'Fluency',
         'ProcessWire>=3.0.184'
     ],
 	'href' => 'https://github.com/robertweiss/ProcessTranslatePage',
-	'permission' => 'fluency-translate',
+	'permission' => 'translate',
     'singular' => true,
     'autoload' => 'template=admin'
 );
