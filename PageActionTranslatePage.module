@@ -1,0 +1,59 @@
+<?php namespace ProcessWire;
+
+/**
+ * Action that translates the page
+ */
+
+class PageActionTranslatePage extends PageAction implements Module {
+
+	public static function getModuleInfo() {
+		return array(
+			'title' => __('Page Action: Translate Page', __FILE__),
+			'summary' => __('Action for Lister that translates all fields on a page using the ProcessTranslatePage module.', __FILE__),
+			'version' => 1,
+			'author' => 'Robert Weiss',
+			'permission' => 'page-action-translate-page',
+			'permissions' => array('page-action-translate-page' => 'Page Action: Translate Page'),
+            'requires' => ['ProcessWire>=3.0.184', 'ProcessTranslatePage>=0.1.1'],
+		);
+	}
+
+	public function __construct() {
+		parent::__construct();
+	}
+
+	/**
+	 * Apply action to page
+	 *
+	 * @param Page $page
+	 * @return bool
+	 *
+	 */
+	protected function ___action($page) {
+		$of = $page->of();
+		if($of) $page->of(false);
+
+        /** @var ProcessTranslatePage $module */
+        $module = $this->wire('modules')->get('ProcessTranslatePage');
+
+        if (!$module) {
+            $this->message(sprintf(
+                $this->_('The ProcessTranslatePage module is not installed.'),
+            ));
+            return false;
+        }
+
+        $module->translatePage($page);
+
+		if($of) $page->of(true);
+
+        $this->message(sprintf(
+                           $this->_('Page %1$s was translated'),
+                           $page->path
+		));
+
+		return true;
+	}
+
+}
+

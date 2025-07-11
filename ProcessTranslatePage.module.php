@@ -275,6 +275,7 @@ class ProcessTranslatePage extends Process implements Module {
     }
 
     public function translatePageTree(Page $page, bool $includeHidden = true) {
+        $this->initApi();
         $this->initSettings();
         // Only process page if template is valid
         if (!in_array($page->template->name, array_merge($this->adminTemplates, $this->excludedTemplates))) {
@@ -288,6 +289,12 @@ class ProcessTranslatePage extends Process implements Module {
         foreach ($page->children($selector) as $item) {
             $this->translatePageTree($item, $includeHidden);
         }
+    }
+
+    public function translatePage(Page $page) {
+        $this->initApi();
+        $this->initSettings();
+        $this->processFields($page, false);
     }
 
     private function setLanguages(): void {
