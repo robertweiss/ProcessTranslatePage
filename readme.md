@@ -42,8 +42,18 @@ Please note: The ›Changed fields‹ option currently supports only one level d
 - RockPageBuilder (3rd party)
 - All the mentioned fields inside Repeater, RepeaterMatrix, FieldsetPage, Functional and Table fields (ProFields)
 
+### Batch Translation with ListerPro
+
+For translating multiple pages simultaneously, you can use the included ListerPro Page Action. This allows you to batch translate pages directly from the admin interface.
+
+**Prerequisites:** ListerPro is a (highly recommended) commercial ProcessWire module that must be purchased first from https://processwire.com/store/lister-pro/
+
+**Installation:** The PageActionTranslatePage module needs to be installed separately. After installing ProcessTranslatePage, install the PageActionTranslatePage module and assign the `page-action-translate-page` permission to your user role.
+
+**Usage:** Create a ListerPro list, add the Translate Page Action to your allowed actions, select the pages you want to translate, and use the "Translate Page" action to batch translate all selected pages.
+
 ### Command line usage
 
-For translating multiple pages simultaneously and avoiding timeouts, you can use the included script `translate-pagetree.php` from the command line. Before running the script, please update the variables `$username`, `$home`, and `$includeHidden` to suit your requirements.
+For translating multiple pages simultaneously and avoiding timeouts, you can also use the included script `translate-pagetree.php` from the command line. Before running the script, please update the variables `$username`, `$home`, and `$includeHidden` to suit your requirements.
 
 **Kindly note that this is a beta release.** Although it is successfully used in production for several of my clients, I recommend thorough testing before deploying it in your projects. If you encounter any bugs, please consider creating a GitHub issue to help me improve.
