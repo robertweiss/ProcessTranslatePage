@@ -115,7 +115,7 @@ class TranslateGlossary {
         return true;
     }
 
-    private static function convertGlossaryStringToArray(string $glossaryString): array {
+    private static function convertGlossaryStringToArray(string $glossaryString = ''): array {
         if (!$glossaryString) {
             return [];
         }
