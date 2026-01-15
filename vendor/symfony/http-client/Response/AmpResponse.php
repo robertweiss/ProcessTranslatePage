@@ -27,8 +27,8 @@ use Symfony\Component\HttpClient\Chunk\InformationalChunk;
 use Symfony\Component\HttpClient\Exception\InvalidArgumentException;
 use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\HttpClientTrait;
-use Symfony\Component\HttpClient\Internal\AmpBodyV4;
-use Symfony\Component\HttpClient\Internal\AmpClientStateV4;
+use Symfony\Component\HttpClient\Internal\AmpBody;
+use Symfony\Component\HttpClient\Internal\AmpClientState;
 use Symfony\Component\HttpClient\Internal\Canary;
 use Symfony\Component\HttpClient\Internal\ClientState;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -38,13 +38,14 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  *
  * @internal
  */
-final class AmpResponseV4 implements ResponseInterface, StreamableInterface
+final class AmpResponse implements ResponseInterface, StreamableInterface
 {
     use CommonResponseTrait;
     use TransportResponseTrait;
 
     private static string $nextId = 'a';
 
+    private AmpClientState $multi;
     private ?array $options;
     private \Closure $onProgress;
 
@@ -53,12 +54,9 @@ final class AmpResponseV4 implements ResponseInterface, StreamableInterface
     /**
      * @internal
      */
-    public function __construct(
-        private AmpClientStateV4 $multi,
-        Request $request,
-        array $options,
-        ?LoggerInterface $logger,
-    ) {
+    public function __construct(AmpClientState $multi, Request $request, array $options, ?LoggerInterface $logger)
+    {
+        $this->multi = $multi;
         $this->options = &$options;
         $this->logger = $logger;
         $this->timeout = $options['timeout'];
@@ -101,7 +99,8 @@ final class AmpResponseV4 implements ResponseInterface, StreamableInterface
 
         $throttleWatcher = null;
 
-        $this->id = $id = self::$nextId++;
+        $this->id = $id = self::$nextId;
+        self::$nextId = str_increment(self::$nextId);
         Loop::defer(static function () use ($request, $multi, $id, &$info, &$headers, $canceller, &$options, $onProgress, &$handle, $logger, &$pause) {
             return new Coroutine(self::generateResponse($request, $multi, $id, $info, $headers, $canceller, $options, $onProgress, $handle, $logger, $pause));
         });
@@ -141,12 +140,12 @@ final class AmpResponseV4 implements ResponseInterface, StreamableInterface
         return null !== $type ? $this->info[$type] ?? null : $this->info;
     }
 
-    public function __sleep(): array
+    public function __serialize(): array
     {
         throw new \BadMethodCallException('Cannot serialize '.__CLASS__);
     }
 
-    public function __wakeup(): void
+    public function __unserialize(array $data): void
     {
         throw new \BadMethodCallException('Cannot unserialize '.__CLASS__);
     }
@@ -179,7 +178,7 @@ final class AmpResponseV4 implements ResponseInterface, StreamableInterface
     }
 
     /**
-     * @param AmpClientStateV4 $multi
+     * @param AmpClientState $multi
      */
     private static function perform(ClientState $multi, ?array $responses = null): void
     {
@@ -197,7 +196,7 @@ final class AmpResponseV4 implements ResponseInterface, StreamableInterface
     }
 
     /**
-     * @param AmpClientStateV4 $multi
+     * @param AmpClientState $multi
      */
     private static function select(ClientState $multi, float $timeout): int
     {
@@ -215,7 +214,7 @@ final class AmpResponseV4 implements ResponseInterface, StreamableInterface
         return null === self::$delay ? 1 : 0;
     }
 
-    private static function generateResponse(Request $request, AmpClientStateV4 $multi, string $id, array &$info, array &$headers, CancellationTokenSource $canceller, array &$options, \Closure $onProgress, &$handle, ?LoggerInterface $logger, Promise &$pause): \Generator
+    private static function generateResponse(Request $request, AmpClientState $multi, string $id, array &$info, array &$headers, CancellationTokenSource $canceller, array &$options, \Closure $onProgress, &$handle, ?LoggerInterface $logger, Promise &$pause): \Generator
     {
         $request->setInformationalResponseHandler(static function (Response $response) use ($multi, $id, &$info, &$headers) {
             self::addResponseHeaders($response, $info, $headers);
@@ -224,7 +223,7 @@ final class AmpResponseV4 implements ResponseInterface, StreamableInterface
         });
 
         try {
-            /* @var Response $response */
+            /** @var Response $response */
             if (null === $response = yield from self::getPushedResponse($request, $multi, $info, $headers, $options, $logger)) {
                 $logger?->info(\sprintf('Request: "%s %s"', $info['http_method'], $info['url']));
 
@@ -274,11 +273,11 @@ final class AmpResponseV4 implements ResponseInterface, StreamableInterface
         self::stopLoop();
     }
 
-    private static function followRedirects(Request $originRequest, AmpClientStateV4 $multi, array &$info, array &$headers, CancellationTokenSource $canceller, array $options, \Closure $onProgress, &$handle, ?LoggerInterface $logger, Promise &$pause): \Generator
+    private static function followRedirects(Request $originRequest, AmpClientState $multi, array &$info, array &$headers, CancellationTokenSource $canceller, array $options, \Closure $onProgress, &$handle, ?LoggerInterface $logger, Promise &$pause): \Generator
     {
         yield $pause;
 
-        $originRequest->setBody(new AmpBodyV4($options['body'], $info, $onProgress));
+        $originRequest->setBody(new AmpBody($options['body'], $info, $onProgress));
         $response = yield $multi->request($options, $originRequest, $canceller->getToken(), $info, $onProgress, $handle);
         $previousUrl = null;
 
@@ -330,6 +329,10 @@ final class AmpResponseV4 implements ResponseInterface, StreamableInterface
             $request->setTcpConnectTimeout($originRequest->getTcpConnectTimeout());
             $request->setTlsHandshakeTimeout($originRequest->getTlsHandshakeTimeout());
             $request->setTransferTimeout($originRequest->getTransferTimeout());
+            $request->setBodySizeLimit(0);
+            if (method_exists($request, 'setInactivityTimeout')) {
+                $request->setInactivityTimeout(0);
+            }
 
             if (303 === $status || \in_array($status, [301, 302], true) && 'POST' === $response->getRequest()->getMethod()) {
                 // Do like curl and browsers: turn POST to GET on 301, 302 and 303
@@ -340,7 +343,7 @@ final class AmpResponseV4 implements ResponseInterface, StreamableInterface
                 $info['http_method'] = 'HEAD' === $response->getRequest()->getMethod() ? 'HEAD' : 'GET';
                 $request->setMethod($info['http_method']);
             } else {
-                $request->setBody(AmpBodyV4::rewind($response->getRequest()->getBody()));
+                $request->setBody(AmpBody::rewind($response->getRequest()->getBody()));
             }
 
             foreach ($originRequest->getRawHeaders() as [$name, $value]) {
@@ -386,7 +389,7 @@ final class AmpResponseV4 implements ResponseInterface, StreamableInterface
     /**
      * Accepts pushed responses only if their headers related to authentication match the request.
      */
-    private static function getPushedResponse(Request $request, AmpClientStateV4 $multi, array &$info, array &$headers, array $options, ?LoggerInterface $logger): \Generator
+    private static function getPushedResponse(Request $request, AmpClientState $multi, array &$info, array &$headers, array $options, ?LoggerInterface $logger): \Generator
     {
         if ('' !== $options['body']) {
             return null;
@@ -421,17 +424,6 @@ final class AmpResponseV4 implements ResponseInterface, StreamableInterface
                     }
                 }
             }
-
-            $info += [
-                'connect_time' => 0.0,
-                'pretransfer_time' => 0.0,
-                'starttransfer_time' => 0.0,
-                'total_time' => 0.0,
-                'namelookup_time' => 0.0,
-                'primary_ip' => '',
-                'primary_port' => 0,
-                'start_time' => microtime(true),
-            ];
 
             $pushDeferred->resolve();
             $logger?->debug(\sprintf('Accepting pushed response: "%s %s"', $info['http_method'], $info['url']));

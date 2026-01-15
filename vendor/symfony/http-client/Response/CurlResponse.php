@@ -32,6 +32,8 @@ final class CurlResponse implements ResponseInterface, StreamableInterface
     }
     use TransportResponseTrait;
 
+    private CurlClientState $multi;
+
     /**
      * @var resource
      */
@@ -40,16 +42,10 @@ final class CurlResponse implements ResponseInterface, StreamableInterface
     /**
      * @internal
      */
-    public function __construct(
-        private CurlClientState $multi,
-        \CurlHandle|string $ch,
-        ?array $options = null,
-        ?LoggerInterface $logger = null,
-        string $method = 'GET',
-        ?callable $resolveRedirect = null,
-        ?int $curlVersion = null,
-        ?string $originalUrl = null,
-    ) {
+    public function __construct(CurlClientState $multi, \CurlHandle|string $ch, ?array $options = null, ?LoggerInterface $logger = null, string $method = 'GET', ?callable $resolveRedirect = null, ?int $curlVersion = null, ?string $originalUrl = null)
+    {
+        $this->multi = $multi;
+
         if ($ch instanceof \CurlHandle) {
             $this->handle = $ch;
             $this->debugBuffer = fopen('php://temp', 'w+');
@@ -400,7 +396,7 @@ final class CurlResponse implements ResponseInterface, StreamableInterface
                 $info['peer_certificate_chain'] = array_map('openssl_x509_read', array_column($certinfo, 'Cert'));
             }
 
-            if (300 <= $info['http_code'] && $info['http_code'] < 400) {
+            if (300 <= $info['http_code'] && $info['http_code'] < 400 && null !== $options) {
                 if (curl_getinfo($ch, \CURLINFO_REDIRECT_COUNT) === $options['max_redirects']) {
                     curl_setopt($ch, \CURLOPT_FOLLOWLOCATION, false);
                 } elseif (303 === $info['http_code'] || ('POST' === $info['http_method'] && \in_array($info['http_code'], [301, 302], true))) {
@@ -422,7 +418,7 @@ final class CurlResponse implements ResponseInterface, StreamableInterface
 
         $info['redirect_url'] = null;
 
-        if (300 <= $statusCode && $statusCode < 400 && null !== $location) {
+        if (300 <= $statusCode && $statusCode < 400 && null !== $location && null !== $options) {
             if ($noContent = 303 === $statusCode || ('POST' === $info['http_method'] && \in_array($statusCode, [301, 302], true))) {
                 $info['http_method'] = 'HEAD' === $info['http_method'] ? 'HEAD' : 'GET';
                 curl_setopt($ch, \CURLOPT_CUSTOMREQUEST, $info['http_method']);
@@ -437,7 +433,7 @@ final class CurlResponse implements ResponseInterface, StreamableInterface
 
         if (401 === $statusCode && isset($options['auth_ntlm']) && 0 === strncasecmp($headers['www-authenticate'][0] ?? '', 'NTLM ', 5)) {
             // Continue with NTLM auth
-        } elseif ($statusCode < 300 || 400 <= $statusCode || null === $location || curl_getinfo($ch, \CURLINFO_REDIRECT_COUNT) === $options['max_redirects']) {
+        } elseif ($statusCode < 300 || 400 <= $statusCode || null === $location || null === $options || curl_getinfo($ch, \CURLINFO_REDIRECT_COUNT) === $options['max_redirects']) {
             // Headers and redirects completed, time to get the response's content
             $multi->handlesActivity[$id][] = new FirstChunk();
 

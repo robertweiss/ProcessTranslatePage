@@ -3,7 +3,7 @@
         'name' => '__root__',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '6c21817e87828bfb0a44bcce96067b56bc8988cd',
+        'reference' => 'fb09451bd6a9680e0cfe33cd7a3148efe2d70dd1',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -13,7 +13,7 @@
         '__root__' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '6c21817e87828bfb0a44bcce96067b56bc8988cd',
+            'reference' => 'fb09451bd6a9680e0cfe33cd7a3148efe2d70dd1',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
@@ -149,9 +149,9 @@
             'dev_requirement' => false,
         ),
         'symfony/http-client' => array(
-            'pretty_version' => 'v7.2.4',
-            'version' => '7.2.4.0',
-            'reference' => '78981a2ffef6437ed92d4d7e2a86a82f256c6dc6',
+            'pretty_version' => 'v6.4.31',
+            'version' => '6.4.31.0',
+            'reference' => 'f166fe476c996237666bcf7ec2cf827cd82ad573',
             'type' => 'library',
             'install_path' => __DIR__ . '/../symfony/http-client',
             'aliases' => array(),
@@ -171,6 +171,15 @@
             'provided' => array(
                 0 => '3.0',
             ),
+        ),
+        'symfony/polyfill-php83' => array(
+            'pretty_version' => 'v1.33.0',
+            'version' => '1.33.0.0',
+            'reference' => '17f6f9a6b1735c0f163024d959f700cfbc5155e5',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../symfony/polyfill-php83',
+            'aliases' => array(),
+            'dev_requirement' => false,
         ),
         'symfony/service-contracts' => array(
             'pretty_version' => 'v3.5.1',

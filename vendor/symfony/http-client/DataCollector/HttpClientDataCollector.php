@@ -64,7 +64,9 @@ final class HttpClientDataCollector extends DataCollector implements LateDataCol
             $this->data['error_count'] += $errorCount;
             $this->data['clients'][$name]['error_count'] += $errorCount;
 
-            $client->reset();
+            if ($traces) {
+                $client->reset();
+            }
         }
     }
 
@@ -201,11 +203,14 @@ final class HttpClientDataCollector extends DataCollector implements LateDataCol
                 $dataArg[] = '--data-raw '.$this->escapePayload($body);
             } elseif (\is_array($body)) {
                 try {
-                    $body = explode('&', self::normalizeBody($body));
+                    $body = self::normalizeBody($body);
                 } catch (TransportException) {
                     return null;
                 }
-                foreach ($body as $value) {
+                if (!\is_string($body)) {
+                    return null;
+                }
+                foreach (explode('&', $body) as $value) {
                     $dataArg[] = '--data-raw '.$this->escapePayload(urldecode($value));
                 }
             } else {
@@ -213,7 +218,7 @@ final class HttpClientDataCollector extends DataCollector implements LateDataCol
             }
         }
 
-        $dataArg = $dataArg ? implode(' ', $dataArg) : null;
+        $dataArg = empty($dataArg) ? null : implode(' ', $dataArg);
 
         foreach (explode("\n", $trace['info']['debug']) as $line) {
             $line = substr($line, 0, -1);
@@ -252,7 +257,7 @@ final class HttpClientDataCollector extends DataCollector implements LateDataCol
     {
         static $useProcess;
 
-        if ($useProcess ??= function_exists('proc_open') && class_exists(Process::class)) {
+        if ($useProcess ??= \function_exists('proc_open') && class_exists(Process::class)) {
             return substr((new Process(['', $payload]))->getCommandLine(), 3);
         }
 

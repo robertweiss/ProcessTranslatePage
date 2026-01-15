@@ -32,11 +32,12 @@ final class EventSourceHttpClient implements HttpClientInterface, ResetInterface
         AsyncDecoratorTrait::withOptions insteadof HttpClientTrait;
     }
 
-    public function __construct(
-        ?HttpClientInterface $client = null,
-        private float $reconnectionTime = 10.0,
-    ) {
+    private float $reconnectionTime;
+
+    public function __construct(?HttpClientInterface $client = null, float $reconnectionTime = 10.0)
+    {
         $this->client = $client ?? HttpClient::create();
+        $this->reconnectionTime = $reconnectionTime;
     }
 
     public function connect(string $url, array $options = [], string $method = 'GET'): ResponseInterface

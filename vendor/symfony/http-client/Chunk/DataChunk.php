@@ -20,10 +20,13 @@ use Symfony\Contracts\HttpClient\ChunkInterface;
  */
 class DataChunk implements ChunkInterface
 {
-    public function __construct(
-        private int $offset = 0,
-        private string $content = '',
-    ) {
+    private int $offset = 0;
+    private string $content = '';
+
+    public function __construct(int $offset = 0, string $content = '')
+    {
+        $this->offset = $offset;
+        $this->content = $content;
     }
 
     public function isTimeout(): bool

@@ -32,19 +32,19 @@ class RetryableHttpClient implements HttpClientInterface, ResetInterface
     use AsyncDecoratorTrait;
 
     private RetryStrategyInterface $strategy;
+    private int $maxRetries;
+    private ?LoggerInterface $logger;
     private array $baseUris = [];
 
     /**
      * @param int $maxRetries The maximum number of times to retry
      */
-    public function __construct(
-        HttpClientInterface $client,
-        ?RetryStrategyInterface $strategy = null,
-        private int $maxRetries = 3,
-        private ?LoggerInterface $logger = null,
-    ) {
+    public function __construct(HttpClientInterface $client, ?RetryStrategyInterface $strategy = null, int $maxRetries = 3, ?LoggerInterface $logger = null)
+    {
         $this->client = $client;
         $this->strategy = $strategy ?? new GenericRetryStrategy();
+        $this->maxRetries = $maxRetries;
+        $this->logger = $logger;
     }
 
     public function withOptions(array $options): static
@@ -201,6 +201,8 @@ class RetryableHttpClient implements HttpClientInterface, ResetInterface
         if ($baseUris) {
             $baseUri = 1 < \count($baseUris) ? array_shift($baseUris) : current($baseUris);
             $options['base_uri'] = \is_array($baseUri) ? $baseUri[array_rand($baseUri)] : $baseUri;
+        } elseif (\is_array($options['base_uri'] ?? null)) {
+            unset($options['base_uri']);
         }
 
         return $options;

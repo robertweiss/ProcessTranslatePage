@@ -39,7 +39,7 @@ use Psr\Log\LoggerInterface;
  *
  * @internal
  */
-final class AmpClientStateV4 extends ClientState
+final class AmpClientState extends ClientState
 {
     public array $dnsCache = [];
     public int $responseCount = 0;
@@ -47,15 +47,18 @@ final class AmpClientStateV4 extends ClientState
 
     private array $clients = [];
     private \Closure $clientConfigurator;
+    private int $maxHostConnections;
+    private int $maxPendingPushes;
+    private ?LoggerInterface $logger;
 
-    public function __construct(
-        ?callable $clientConfigurator,
-        private int $maxHostConnections,
-        private int $maxPendingPushes,
-        private ?LoggerInterface &$logger,
-    ) {
+    public function __construct(?callable $clientConfigurator, int $maxHostConnections, int $maxPendingPushes, ?LoggerInterface &$logger)
+    {
         $clientConfigurator ??= static fn (PooledHttpClient $client) => new InterceptedHttpClient($client, new RetryRequests(2));
         $this->clientConfigurator = $clientConfigurator(...);
+
+        $this->maxHostConnections = $maxHostConnections;
+        $this->maxPendingPushes = $maxPendingPushes;
+        $this->logger = &$logger;
     }
 
     /**
@@ -90,7 +93,7 @@ final class AmpClientStateV4 extends ClientState
             $info['peer_certificate_chain'] = [];
         }
 
-        $request->addEventListener(new AmpListenerV4($info, $options['peer_fingerprint']['pin-sha256'] ?? [], $onProgress, $handle));
+        $request->addEventListener(new AmpListener($info, $options['peer_fingerprint']['pin-sha256'] ?? [], $onProgress, $handle));
         $request->setPushHandler(fn ($request, $response): Promise => $this->handlePush($request, $response, $options));
 
         ($request->hasHeader('content-length') ? new Success((int) $request->getHeader('content-length')) : $request->getBody()->getBodyLength())
@@ -157,7 +160,7 @@ final class AmpClientStateV4 extends ClientState
                 return $result;
             }
         };
-        $connector->connector = new DnsConnector(new AmpResolverV4($this->dnsCache));
+        $connector->connector = new DnsConnector(new AmpResolver($this->dnsCache));
 
         $context = (new ConnectContext())
             ->withTcpNoDelay()

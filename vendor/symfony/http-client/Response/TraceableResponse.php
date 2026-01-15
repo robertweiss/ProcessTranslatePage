@@ -31,20 +31,25 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  */
 class TraceableResponse implements ResponseInterface, StreamableInterface
 {
-    public function __construct(
-        private HttpClientInterface $client,
-        private ResponseInterface $response,
-        private mixed &$content,
-        private ?StopwatchEvent $event = null,
-    ) {
+    private HttpClientInterface $client;
+    private ResponseInterface $response;
+    private mixed $content;
+    private ?StopwatchEvent $event;
+
+    public function __construct(HttpClientInterface $client, ResponseInterface $response, &$content, ?StopwatchEvent $event = null)
+    {
+        $this->client = $client;
+        $this->response = $response;
+        $this->content = &$content;
+        $this->event = $event;
     }
 
-    public function __sleep(): array
+    public function __serialize(): array
     {
         throw new \BadMethodCallException('Cannot serialize '.__CLASS__);
     }
 
-    public function __wakeup(): void
+    public function __unserialize(array $data): void
     {
         throw new \BadMethodCallException('Cannot unserialize '.__CLASS__);
     }

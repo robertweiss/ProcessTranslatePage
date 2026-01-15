@@ -30,12 +30,12 @@ use Symfony\Contracts\Service\ResetInterface;
  */
 final class NoPrivateNetworkHttpClient implements HttpClientInterface, LoggerAwareInterface, ResetInterface
 {
-    use HttpClientTrait;
     use AsyncDecoratorTrait;
+    use HttpClientTrait;
 
     private array $defaultOptions = self::OPTIONS_DEFAULTS;
     private HttpClientInterface $client;
-    private array|null $subnets;
+    private ?array $subnets;
     private int $ipFlags;
     private \ArrayObject $dnsCache;
 
@@ -159,13 +159,8 @@ final class NoPrivateNetworkHttpClient implements HttpClientInterface, LoggerAwa
         });
     }
 
-    /**
-     * @deprecated since Symfony 7.1, configure the logger on the wrapped HTTP client directly instead
-     */
     public function setLogger(LoggerInterface $logger): void
     {
-        trigger_deprecation('symfony/http-client', '7.1', 'Configure the logger on the wrapped HTTP client directly instead.');
-
         if ($this->client instanceof LoggerAwareInterface) {
             $this->client->setLogger($logger);
         }
@@ -209,7 +204,7 @@ final class NoPrivateNetworkHttpClient implements HttpClientInterface, LoggerAwa
 
         if ($ip = dns_get_record($host, \DNS_AAAA)) {
             $ip = $ip[0]['ipv6'];
-        } elseif (extension_loaded('sockets')) {
+        } elseif (\extension_loaded('sockets')) {
             if (!$info = socket_addrinfo_lookup($host, 0, ['ai_socktype' => \SOCK_STREAM, 'ai_family' => \AF_INET6])) {
                 return $host;
             }
