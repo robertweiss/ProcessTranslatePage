@@ -31,7 +31,7 @@ class TranslateGlossary {
 
         foreach (wire('languages') as $language) {
             if ($language->id !== $sourceLanguage->id) {
-                $entryArr = self::convertGlossaryStringToArray($language->translate_glossary);
+                $entryArr = self::convertGlossaryStringToArray($language->translate_glossary ?? '');
                 if (empty($entryArr)) {
                     continue;
                 }
