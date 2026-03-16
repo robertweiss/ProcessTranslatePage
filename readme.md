@@ -56,4 +56,4 @@ For translating multiple pages simultaneously, you can use the included ListerPr
 
 For translating multiple pages simultaneously and avoiding timeouts, you can also use the included script `translate-pagetree.php` from the command line. Before running the script, please update the variables `$username`, `$home`, and `$includeHidden` to suit your requirements.
 
-**Kindly note that this is a beta release.** Although it is successfully used in production for several of my clients, I recommend thorough testing before deploying it in your projects. If you encounter any bugs, please consider creating a GitHub issue to help me improve.
+This module is successfully used in production for several of my clients, though as always I recommend thorough testing before deploying it in your projects. If you encounter any bugs, please consider creating a GitHub issue to help me improve.
