@@ -558,7 +558,7 @@ class ProcessTranslatePage extends Process implements Module {
     private function processComboFields(Field $field, Page $page) {
         $comboFieldsName = $field->name;
         foreach ($page->$field as $comboFieldName => $comboField) {
-            if (get_class($comboField) !== 'ProcessWire\ComboLanguagesValue') {
+            if (!($comboField instanceof ComboLanguagesValue)) {
                 continue;
             }
 
