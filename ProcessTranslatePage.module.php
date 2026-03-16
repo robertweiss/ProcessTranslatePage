@@ -53,7 +53,7 @@ class ProcessTranslatePage extends Process implements Module {
             $field->type = $this->modules->get("FieldtypeText");
             $field->name = "translate_locale";
             $field->label = $this->_('Locale');
-            $field->description = $this->_('Used for DeepL translations. Valid values: https://developers.deepl.com/docs/getting-started/supported-languages');
+            $field->description = $this->_('Used for DeepL translations. Valid values: [https://developers.deepl.com/docs/getting-started/supported-languages](https://developers.deepl.com/docs/getting-started/supported-languages)');
             $field->columnWidth = 50;
             $field->save();
         }
@@ -297,25 +297,33 @@ class ProcessTranslatePage extends Process implements Module {
         $this->processFields($page, false);
     }
 
-    private function setLanguages(): void {
-        // Set source language
+    public function ___getSourceLanguage(): Language {
         $sourceLanguageName = $this->sourceLanguageName ?: 'default';
+        if ($sourceLanguageName === 'current_user_language') {
+            return wire('user')->language;
+        }
         foreach (wire('languages') as $language) {
             if ($language->name == $sourceLanguageName) {
-                $this->sourceLanguage = $language;
-                break;
+                return $language;
             }
         }
+        return wire('languages')->get('default');
+    }
 
-        // Set target languages[]
+    public function ___getTargetLanguages(): array {
+        $targetLanguages = [];
         foreach (wire('languages') as $language) {
-            // Ignore languages which are set as excluded or source in user settings
             if (in_array($language->name, $this->excludedLanguages) || $language->name == $this->sourceLanguage->name) {
                 continue;
             }
-
-            $this->targetLanguages[] = $language;
+            $targetLanguages[] = $language;
         }
+        return $targetLanguages;
+    }
+
+    private function setLanguages(): void {
+        $this->sourceLanguage = $this->getSourceLanguage();
+        $this->targetLanguages = $this->getTargetLanguages();
     }
 
     private function translate(string $value, string $targetLanguageLocale): string {

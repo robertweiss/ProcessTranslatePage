@@ -126,7 +126,7 @@ class ProcessTranslatePageConfig extends ModuleConfig {
                 'name+id' => 'sourceLanguageName',
                 'label' => $this->_('Source Language'),
                 'description' => $this->_('The language which will be used to translate from. If no selection is made, the default language will be used'),
-                'options' => $this->getLanguageOptions(),
+                'options' => array_merge(['current_user_language' => $this->_('Current user language')], $this->getLanguageOptions()),
                 'columnWidth' => 33,
             ])
         );
