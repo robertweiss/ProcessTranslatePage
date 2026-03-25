@@ -146,10 +146,10 @@ class ProcessTranslatePage extends Process implements Module {
         $this->deepLApiKey = $this->get('deepLApiKey');
         $this->deepLGlossaryId = $this->get('deepLGlossaryId');
         $this->sourceLanguageName = $this->get('sourceLanguageName');
-        $this->excludedTemplates = $this->get('excludedTemplates');
-        $this->excludedFields = $this->get('excludedFields');
-        $this->excludedLanguages = $this->get('excludedLanguages');
-        $this->writemode = $this->get('writemode');
+        $this->excludedTemplates = $this->get('excludedTemplates') ?: [];
+        $this->excludedFields = $this->get('excludedFields') ?: [];
+        $this->excludedLanguages = $this->get('excludedLanguages') ?: [];
+        $this->writemode = $this->get('writemode') ?: 'all';
         $this->showSingleTargetLanguageButtons = !!$this->get('showSingleTargetLanguageButtons');
         $this->throttleSave = 5;
 
@@ -244,7 +244,8 @@ class ProcessTranslatePage extends Process implements Module {
         /** @var Page $page */
         $page = $this->pages->get($this->input->get->id);
 
-        // Don’t show option in excluded or admin templates
+        // Don’t show option if page is not found or in excluded/admin templates
+        if (!$page->id) return;
         if (in_array($page->template->name, array_merge($this->adminTemplates, $this->excludedTemplates))) {
             return;
         }
@@ -356,11 +357,13 @@ class ProcessTranslatePage extends Process implements Module {
     }
 
     private function processFields($page, $isPageWhichSaveWasHookedOn = true) {
+        if ($page === null) return;
         $page->of(false);
         $fields = $page->template->fields;
 
         if (get_class($page) === 'ProcessWire\RepeaterMatrixPage') {
             $fields = $page->matrix('fields');
+            if ($fields === null) return;
         }
 
         foreach ($fields as $field) {
@@ -442,7 +445,7 @@ class ProcessTranslatePage extends Process implements Module {
     private function processFileField(Field $field, Page $page) {
         /** @var Field $field */
         $field = $page->$field;
-        if (!$field->count()) {
+        if ($field === null || !$field->count()) {
             return;
         }
         $countField = false;
@@ -467,9 +470,10 @@ class ProcessTranslatePage extends Process implements Module {
                 $value = $item->$fileField;
                 // Iterate through all target languages
                 foreach ($this->targetLanguages as $targetLanguage) {
+                    if (!$value) continue;
                     $targetLangValue = ($fileField === 'description') ? $item->$fileField($targetLanguage) : $item->$fileField->getLanguageValue($targetLanguage);
 
-                    if (!$value || ($targetLangValue != '' && $this->writemode == 'empty')) {
+                    if ($targetLangValue != '' && $this->writemode == 'empty') {
                         continue;
                     }
                     $result = $this->translate($value, $targetLanguage->translate_locale);
@@ -491,6 +495,7 @@ class ProcessTranslatePage extends Process implements Module {
     }
 
     private function processRepeaterField($field, Page $page) {
+        if ($page->$field === null) return;
         foreach ($page->$field as $item) {
             $this->processFields($item, false);
         }
@@ -501,6 +506,7 @@ class ProcessTranslatePage extends Process implements Module {
     }
 
     private function processFunctionalField(Field $field, Page $page) {
+        if ($page->$field === null) return;
         foreach ($page->$field as $name => $value) {
             // Ignore fallback values (starting with a dot)
             if (strpos($name, '.') === 0) {
@@ -510,8 +516,8 @@ class ProcessTranslatePage extends Process implements Module {
 
             foreach ($this->targetLanguages as $targetLanguage) {
                 $targetFieldName = $name.'.'.$targetLanguage->id;
-                // If translation already exists and should not be overwritten, continue
-                if ($page->$field->$targetFieldName != '' && $this->writemode == 'empty') {
+                // If field is empty or translation already exists and should not be overwritten, continue
+                if (!$value || ($page->$field->$targetFieldName != '' && $this->writemode == 'empty')) {
                     continue;
                 }
                 $result = $this->translate($value, $targetLanguage->translate_locale);
@@ -527,6 +533,7 @@ class ProcessTranslatePage extends Process implements Module {
 
     private function processTableField(Field $field, Page $page) {
         $fieldName = $field->name;
+        if ($page->$field === null) return;
 
         foreach ($page->$field as $row) {
             /** @var TableRow $row */
@@ -557,6 +564,7 @@ class ProcessTranslatePage extends Process implements Module {
 
     private function processComboFields(Field $field, Page $page) {
         $comboFieldsName = $field->name;
+        if ($page->$field === null) return;
         foreach ($page->$field as $comboFieldName => $comboField) {
             if (!($comboField instanceof ComboLanguagesValue)) {
                 continue;
