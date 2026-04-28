@@ -2,17 +2,16 @@
 
 require(__DIR__.'/vendor/autoload.php');
 require(__DIR__.'/TranslateGlossary.php');
+require(__DIR__.'/Providers/TranslateProviderInterface.php');
+require(__DIR__.'/Providers/DeepLTranslateProvider.php');
+require(__DIR__.'/Providers/GoogleTranslateProvider.php');
 
 /**
- * Translate all textfields on a page via DeepL
+ * Translate all textfields on a page via DeepL or Google Cloud Translation
  *
  */
 class ProcessTranslatePage extends Process implements Module {
-    public ?\DeepL\Translator $deepL;
-    private ?TranslateGlossary $glossaryInstance;
-    private ?\DeepL\MultilingualGlossaryInfo $glossary = null;
-    private ?string $deepLApiKey;
-    private ?string $deepLGlossaryId;
+    private ?TranslateProviderInterface $provider = null;
     private ?string $sourceLanguageName;
     private Language $sourceLanguage;
     private array $targetLanguages = [];
@@ -53,7 +52,7 @@ class ProcessTranslatePage extends Process implements Module {
             $field->type = $this->modules->get("FieldtypeText");
             $field->name = "translate_locale";
             $field->label = $this->_('Locale');
-            $field->description = $this->_('Used for DeepL translations. Valid values: [https://developers.deepl.com/docs/getting-started/supported-languages](https://developers.deepl.com/docs/getting-started/supported-languages)');
+            $field->description = $this->_('Used for translations. DeepL values: [https://developers.deepl.com/docs/getting-started/supported-languages](https://developers.deepl.com/docs/getting-started/supported-languages). Google uses BCP-47 codes (e.g. de, en-GB, fr).');
             $field->columnWidth = 50;
             $field->save();
         }
@@ -64,7 +63,7 @@ class ProcessTranslatePage extends Process implements Module {
             $field->name = "translate_glossary";
             $field->label = $this->_('Glossary');
             $field->description = $this->_('Custom DeepL Glossary. One translation pair per line. Pairs need to be divided by two equal signs (==) in order to be recognized.');
-            $field->notes = $this->_('Glossary is only used in target languages (Source language word==Target language word).');
+            $field->notes = $this->_('Glossary is only used in target languages (Source language word==Target language word). Glossary is only supported by the DeepL provider.');
             $field->columnWidth = 50;
             $field->save();
         }
@@ -147,30 +146,56 @@ class ProcessTranslatePage extends Process implements Module {
         if ($event->arguments(0) !== 'ProcessTranslatePage') {
             return;
         }
-        if (!$this->input->post->bool('deepLGlossaryDelete')) {
-            return;
-        }
+
         $data = wire('modules')->getConfig('ProcessTranslatePage');
-        $glossaryId = $data['deepLGlossaryId'] ?? '';
-        $apiKey = $data['deepLApiKey'] ?? '';
-        if (!$apiKey || !$glossaryId) {
-            return;
+
+        // DeepL: delete glossary if requested
+        if ($this->input->post->bool('deepLGlossaryDelete')) {
+            $apiKey = $data['deepLApiKey'] ?? '';
+            $glossaryId = $data['deepLGlossaryId'] ?? '';
+            if ($apiKey && $glossaryId) {
+                try {
+                    $client = new \DeepL\DeepLClient($apiKey);
+                    $client->deleteMultilingualGlossary($glossaryId);
+                    $data['deepLGlossaryId'] = null;
+                    wire('modules')->saveConfig('ProcessTranslatePage', $data);
+                    $this->message($this->_('DeepL glossary deleted.'));
+                } catch (\DeepL\DeepLException $e) {
+                    $this->error($e->getMessage());
+                }
+            }
         }
-        try {
-            (new \DeepL\DeepLClient($apiKey))->deleteMultilingualGlossary($glossaryId);
-        } catch (\DeepL\DeepLException $e) {
-            $this->error($e->getMessage());
-            return;
+
+        // Google: validate credentials against the API
+        if (($data['translationProvider'] ?? '') === 'google') {
+            $credentialsJson = $data['googleCredentialsJson'] ?? '';
+            $projectId = $data['googleProjectId'] ?? '';
+
+            if (!$credentialsJson || !$projectId) {
+                return;
+            }
+
+            $credentials = json_decode($credentialsJson, true);
+            if (!is_array($credentials)) {
+                $this->error($this->_('Google Translate: credentials JSON is invalid.'));
+                return;
+            }
+
+            try {
+                $client = new \Google\Cloud\Translate\V3\Client\TranslationServiceClient(['credentials' => $credentials]);
+                $request = (new \Google\Cloud\Translate\V3\GetSupportedLanguagesRequest())
+                    ->setParent('projects/' . $projectId . '/locations/global');
+                $client->getSupportedLanguages($request);
+                $this->message($this->_('Google Cloud Translation credentials verified successfully.'));
+            } catch (\Google\ApiCore\ApiException $e) {
+                $this->error($this->_('Google Translate: ') . $e->getMessage());
+            } catch (\Exception $e) {
+                $this->error($this->_('Google Translate: ') . $e->getMessage());
+            }
         }
-        $data['deepLGlossaryId'] = null;
-        wire('modules')->saveConfig('ProcessTranslatePage', $data);
-        $this->message($this->_('DeepL glossary deleted.'));
     }
 
     public function initSettings(): void {
-        // Set (user-)settings
-        $this->deepLApiKey = $this->get('deepLApiKey');
-        $this->deepLGlossaryId = $this->get('deepLGlossaryId');
         $this->sourceLanguageName = $this->get('sourceLanguageName');
         $this->excludedTemplates = $this->get('excludedTemplates') ?: [];
         $this->excludedFields = $this->get('excludedFields') ?: [];
@@ -183,22 +208,49 @@ class ProcessTranslatePage extends Process implements Module {
     }
 
     private function initApi(): bool {
-        if ($this->deepLApiKey) {
-            try {
-                $this->deepL = new \DeepL\DeepLClient($this->deepLApiKey);
-            } catch (\DeepL\DeepLException $e) {
-                $this->error($e->getMessage());
+        $translationProvider = $this->get('translationProvider') ?: 'deepl';
 
+        if ($translationProvider === 'google') {
+            $credentialsJson = $this->get('googleCredentialsJson') ?: '';
+            $projectId = $this->get('googleProjectId') ?: '';
+
+            if (!$credentialsJson || !$projectId) {
+                $this->error($this->_('Google Translate: credentials JSON and project ID are required.'));
                 return false;
             }
 
-            $this->glossaryInstance = new TranslateGlossary($this);
-            $this->glossary = $this->glossaryInstance->getGlossary();
+            $credentials = json_decode($credentialsJson, true);
+            if (!is_array($credentials)) {
+                $this->error($this->_('Google Translate: credentials JSON is invalid.'));
+                return false;
+            }
+
+            try {
+                $this->provider = new GoogleTranslateProvider($credentials, $projectId, $this);
+            } catch (\Exception $e) {
+                $this->error($e->getMessage());
+                return false;
+            }
 
             return true;
         }
 
-        return false;
+        // DeepL (default)
+        $apiKey = $this->get('deepLApiKey') ?: '';
+        if (!$apiKey) {
+            return false;
+        }
+
+        try {
+            $isFreeAccount = \DeepL\Translator::isAuthKeyFreeAccount($apiKey);
+            $glossaryId = $this->get('deepLGlossaryId') ?: null;
+            $this->provider = new DeepLTranslateProvider($apiKey, $glossaryId, $isFreeAccount, $this->sourceLanguage, $this);
+        } catch (\DeepL\DeepLException $e) {
+            $this->error($e->getMessage());
+            return false;
+        }
+
+        return true;
     }
 
     public function hookTranslatePageSave($event): void {
@@ -240,7 +292,7 @@ class ProcessTranslatePage extends Process implements Module {
             return;
         }
 
-        // Let’s go!
+        // Let's go!
         $this->processFields($page);
         $this->message($this->translatedFieldsCount.' '.__('fields translated.'));
     }
@@ -254,23 +306,28 @@ class ProcessTranslatePage extends Process implements Module {
         // We need the changed field names as a simple array
         $changedFields = array_values($event->arguments(1));
 
-        if(!$this->initApi()) {
+        if (!$this->initApi()) {
             return;
         }
 
-        if(!$this->glossary) {
+        if (!($this->provider instanceof DeepLTranslateProvider)) {
+            return;
+        }
+
+        if ($this->provider->getGlossaryManager()?->getGlossary() === null) {
             return;
         }
 
         if (in_array('translate_glossary', $changedFields)) {
-            $this->glossaryInstance->setGlossaryDictionary($language->translate_glossary, $this->sourceLanguage->translate_locale, $language->translate_locale);
+            $this->provider->updateGlossaryDictionary($language->translate_glossary, $this->sourceLanguage->translate_locale, $language->translate_locale);
         }
     }
+
     public function addDropdownOption($event) {
         /** @var Page $page */
         $page = $this->pages->get($this->input->get->id);
 
-        // Don’t show option if page is not found or in excluded/admin templates
+        // Don't show option if page is not found or in excluded/admin templates
         if (!$page->id) return;
         if (in_array($page->template->name, array_merge($this->adminTemplates, $this->excludedTemplates))) {
             return;
@@ -363,28 +420,7 @@ class ProcessTranslatePage extends Process implements Module {
             return $value;
         }
 
-        $options = [
-            'preserve_formatting' => true,
-            'tag_handling' => 'html',
-        ];
-
-        if ($this->glossary !== null && $this->glossaryInstance->dictionaryExists($this->sourceLanguage->translate_locale, $targetLanguageLocale)) {
-            $options['glossary'] = $this->glossary;
-        }
-
-        if (strtolower($targetLanguageLocale) === 'en') {
-            $targetLanguageLocale = 'EN-GB';
-        }
-
-        try {
-            $result = $this->deepL->translateText($value, $this->sourceLanguage->translate_locale, $targetLanguageLocale, $options);
-        } catch (\DeepL\DeepLException $e) {
-            $this->error($e->getMessage());
-
-            return '';
-        }
-
-        return $result->text;
+        return $this->provider->translate($value, $this->sourceLanguage->translate_locale, $targetLanguageLocale);
     }
 
     private function processFields($page, $isPageWhichSaveWasHookedOn = true) {

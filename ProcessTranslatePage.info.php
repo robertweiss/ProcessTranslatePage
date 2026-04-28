@@ -1,9 +1,9 @@
 <?php namespace ProcessWire;
 
 $info = array(
-	'title' => 'TranslatePage (via DeepL)',
-	'summary' => 'Translates all textfields on a page via DeepL',
-	'version' => 150,
+	'title' => 'TranslatePage (DeepL / Google Translate)',
+	'summary' => 'Translates all textfields on a page via DeepL or Google Cloud Translation',
+	'version' => 160,
 	'author' => 'Robert Weiss',
 	'icon' => 'language',
     'requires' => [
