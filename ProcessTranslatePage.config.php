@@ -68,6 +68,15 @@ class ProcessTranslatePageConfig extends ModuleConfig {
         return $excludedFieldsOptions;
     }
 
+    private function formatGlossaryLabel(\DeepL\MultilingualGlossaryInfo $glossary): string {
+        $pairs = array_map(
+            fn($d) => strtoupper($d->sourceLang) . '→' . strtoupper($d->targetLang) . ' (' . $d->entryCount . ')',
+            $glossary->dictionaries
+        );
+
+        return $glossary->name . ' · ' . implode(', ', $pairs) . ' · ' . $glossary->creationTime->format('Y-m-d');
+    }
+
     public function getInputFields() {
         $moduleConfig = $this->modules->getConfig('ProcessTranslatePage');
         $inputfields = parent::getInputfields();
@@ -83,7 +92,10 @@ class ProcessTranslatePageConfig extends ModuleConfig {
         );
 
         if ($hasDeeplKey) {
-            $deepL = new \DeepL\Translator($moduleConfig['deepLApiKey']);
+            $deepL = new \DeepL\DeepLClient($moduleConfig['deepLApiKey']);
+            $isFree = \DeepL\Translator::isAuthKeyFreeAccount($moduleConfig['deepLApiKey']);
+            $storedId = $moduleConfig['deepLGlossaryId'] ?? '';
+
             try {
                 $usage = $deepL->getUsage();
                 $count = number_format($usage->character->count, 0, '', '.');
@@ -92,33 +104,89 @@ class ProcessTranslatePageConfig extends ModuleConfig {
                 $deepLInfos = "{$count} of {$limit} characters used this month ({$percent}%).";
 
                 if ($usage->anyLimitReached()) {
-                    $deepLInfos .= ' <span class="uk-text-danger">Limit exceeded.</span>';
+                    $deepLInfos .= ' <span class="uk-text-danger">' . $this->_('Limit exceeded.') . '</span>';
                 } else {
                     $deepLInfos = '<span class="uk-text-primary">' . $deepLInfos . '</span>';
                 }
-            } catch (\DeepL\AuthorizationException $e) {
-                bd($e->getMessage());
-                $deepLInfos = '<span class="uk-text-danger">Authorization failed.</span>';
+            } catch (\DeepL\AuthorizationException) {
+                $deepLInfos = '<span class="uk-text-danger">' . $this->_('Authorization failed.') . '</span>';
+            } catch (\DeepL\DeepLException $e) {
+                $deepLInfos = '<span class="uk-text-danger">' . $e->getMessage() . '</span>';
             }
+
+            $planLabel = $isFree ? $this->_('Free plan') : $this->_('Pro plan');
+            $deepLInfos .= ' <span class="uk-text-muted">· ' . $planLabel . '</span>';
 
             $inputfields->add(
                 $this->buildInputField('InputfieldMarkup', [
                     'name+id' => 'deeplInfo',
-                    'label' => $this->_('DeepL usage infos'),
+                    'label' => $this->_('DeepL usage'),
                     'value' => $deepLInfos,
                     'columnWidth' => 50,
                 ])
             );
 
-            $inputfields->add(
-                $this->buildInputField('InputfieldText', [
-                    'name+id' => 'deepLGlossaryId',
-                    'label' => $this->_('DeepL Glossary ID'),
-                    'description' => $this->_('ID of DeepL glossary. Will be automatically set if glossary fields in languages are filled out.'),
-                    'collapsed' => Inputfield::collapsedYes,
-                    'columnWidth' => 100,
-                ])
-            );
+            if ($isFree) {
+                $inputfields->add(
+                    $this->buildInputField('InputfieldMarkup', [
+                        'name+id' => 'deepLFreePlanNotice',
+                        'skipLabel' => Inputfield::skipLabelHeader,
+                        'value' => '<div class="uk-alert-warning" uk-alert><p><strong>' . $this->_('Free plan:') . '</strong> ' . $this->_('Your DeepL account supports only one glossary across all projects. If a glossary already exists, select it below — otherwise it will remain unused.') . '</p></div>',
+                        'columnWidth' => 100,
+                    ])
+                );
+            }
+
+            try {
+                $glossaries = $deepL->listMultilingualGlossaries();
+                $glossaryIds = array_map(fn($g) => $g->glossaryId, $glossaries);
+                $storedIdFound = $storedId && in_array($storedId, $glossaryIds);
+
+                $options = ['' => '— ' . $this->_('Auto-create from language entries')];
+                foreach ($glossaries as $g) {
+                    $options[$g->glossaryId] = $this->formatGlossaryLabel($g);
+                }
+
+                $glossaryDescription = $this->_('Choose which glossary to use, or let the module create one automatically when language glossary entries are saved.');
+
+                if ($storedId && !$storedIdFound) {
+                    $options[$storedId] = $this->_('(not found)') . ' ' . $storedId;
+                    $glossaryDescription = '<span class="uk-text-danger">' . $this->_('The stored glossary was not found on your DeepL account — it may have been deleted externally.') . '</span> ' . $glossaryDescription;
+                }
+
+                $inputfields->add(
+                    $this->buildInputField('InputfieldSelect', [
+                        'name+id' => 'deepLGlossaryId',
+                        'label' => $this->_('Active Glossary'),
+                        'description' => $glossaryDescription,
+                        'options' => $options,
+                        'value' => $storedId,
+                        'columnWidth' => $storedIdFound ? 50 : 100,
+                    ])
+                );
+
+                if ($storedIdFound) {
+                    $inputfields->add(
+                        $this->buildInputField('InputfieldCheckbox', [
+                            'name+id' => 'deepLGlossaryDelete',
+                            'label' => $this->_('Delete glossary'),
+                            'description' => $this->_('Permanently removes this glossary from your DeepL account on save. Entries in the language fields are kept and a new glossary will be created on the next translation.'),
+                            'collapsed' => Inputfield::collapsedYes,
+                            'columnWidth' => 50,
+                        ])
+                    );
+                }
+            } catch (\DeepL\DeepLException) {
+                $inputfields->add(
+                    $this->buildInputField('InputfieldText', [
+                        'name+id' => 'deepLGlossaryId',
+                        'label' => $this->_('DeepL Glossary ID'),
+                        'description' => $this->_('ID of DeepL glossary. Will be automatically set if glossary fields in languages are filled out.'),
+                        'collapsed' => Inputfield::collapsedYes,
+                        'columnWidth' => 100,
+                    ])
+                );
+            }
         }
 
         $inputfields->add(

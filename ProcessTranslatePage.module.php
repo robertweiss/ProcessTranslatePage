@@ -129,6 +129,8 @@ class ProcessTranslatePage extends Process implements Module {
     }
 
     public function init(): void {
+        $this->addHookAfter("Modules::saveConfig", $this, "hookModuleConfigSave");
+
         if (!$this->user->hasPermission('translate')) {
             return;
         }
@@ -139,6 +141,30 @@ class ProcessTranslatePage extends Process implements Module {
         $this->addHookAfter("Pages::saved", $this, "hookLanguagePageSave");
 
         parent::init();
+    }
+
+    public function hookModuleConfigSave($event): void {
+        if ($event->arguments(0) !== 'ProcessTranslatePage') {
+            return;
+        }
+        if (!$this->input->post->bool('deepLGlossaryDelete')) {
+            return;
+        }
+        $data = wire('modules')->getConfig('ProcessTranslatePage');
+        $glossaryId = $data['deepLGlossaryId'] ?? '';
+        $apiKey = $data['deepLApiKey'] ?? '';
+        if (!$apiKey || !$glossaryId) {
+            return;
+        }
+        try {
+            (new \DeepL\DeepLClient($apiKey))->deleteMultilingualGlossary($glossaryId);
+        } catch (\DeepL\DeepLException $e) {
+            $this->error($e->getMessage());
+            return;
+        }
+        $data['deepLGlossaryId'] = null;
+        wire('modules')->saveConfig('ProcessTranslatePage', $data);
+        $this->message($this->_('DeepL glossary deleted.'));
     }
 
     public function initSettings(): void {
@@ -209,7 +235,7 @@ class ProcessTranslatePage extends Process implements Module {
         }
 
         if (!$this->checkForLanguageLocales()) {
-            $this->error(__('One or more languages have no locale set. Please set the locale for all languages.'));;
+            $this->error(__('One or more languages have no locale set. Please set the locale for all languages.'));
 
             return;
         }
@@ -350,10 +376,15 @@ class ProcessTranslatePage extends Process implements Module {
             $targetLanguageLocale = 'EN-GB';
         }
 
-        $result = $this->deepL->translateText($value, $this->sourceLanguage->translate_locale, $targetLanguageLocale, $options);
-        $resultText = $result->text;
+        try {
+            $result = $this->deepL->translateText($value, $this->sourceLanguage->translate_locale, $targetLanguageLocale, $options);
+        } catch (\DeepL\DeepLException $e) {
+            $this->error($e->getMessage());
 
-        return $resultText;
+            return '';
+        }
+
+        return $result->text;
     }
 
     private function processFields($page, $isPageWhichSaveWasHookedOn = true) {

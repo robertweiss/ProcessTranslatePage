@@ -15,13 +15,21 @@ class TranslateGlossary {
         $this->glossary = $this->setGlossary($this->translate->deepLGlossaryId);
 
         if (!$this->glossary) {
-            $this->glossary = $this->createGlossary($this->translate->sourceLanguage);
-
-            if ($this->glossary) {
-                $deepLGlossaryId = $this->glossary->glossaryId;
-                $data = wire('modules')->getConfig('ProcessTranslatePage');
-                $data['deepLGlossaryId'] = $deepLGlossaryId;
-                wire('modules')->saveConfig('ProcessTranslatePage', $data);
+            if ($this->isFreeAccount()) {
+                $existing = $this->getGlossaries();
+                if (!empty($existing)) {
+                    $this->translate->warning($this->translate->_('DeepL free plan: an existing glossary was found. Select it in module settings to use it for translations.'));
+                } else {
+                    $this->glossary = $this->createGlossary($this->translate->sourceLanguage);
+                    if ($this->glossary) {
+                        $this->saveGlossaryId($this->glossary->glossaryId);
+                    }
+                }
+            } else {
+                $this->glossary = $this->createGlossary($this->translate->sourceLanguage);
+                if ($this->glossary) {
+                    $this->saveGlossaryId($this->glossary->glossaryId);
+                }
             }
         }
     }
@@ -69,6 +77,11 @@ class TranslateGlossary {
         try {
             return $this->glossary = $this->translate->deepL->getMultilingualGlossary($id);
         } catch (\DeepL\GlossaryNotFoundException $e) {
+            $this->translate->warning($this->translate->_('Stored DeepL glossary not found, it may have been deleted. A new one will be created if possible.'));
+            $this->saveGlossaryId(null);
+
+            return null;
+        } catch (DeepLException $e) {
             $this->translate->error($e->getMessage());
 
             return null;
@@ -80,19 +93,45 @@ class TranslateGlossary {
     }
 
     public function getGlossaries(): ?array {
-        return $this->translate->deepL->listMultilingualGlossaries();
+        try {
+            return $this->translate->deepL->listMultilingualGlossaries();
+        } catch (DeepLException $e) {
+            $this->translate->error($e->getMessage());
+
+            return null;
+        }
+    }
+
+    public function deleteGlossary(): void {
+        if (!$this->glossary) {
+            return;
+        }
+        try {
+            $this->translate->deepL->deleteMultilingualGlossary($this->glossary);
+        } catch (DeepLException $e) {
+            $this->translate->error($e->getMessage());
+            return;
+        }
+        $this->saveGlossaryId(null);
+        $this->glossary = null;
     }
 
     public function setGlossaryDictionary(string $dictionaryString, string $sourceLanguage, string $targetLanguage): void {
+        if (!$this->glossary) {
+            return;
+        }
+
         $glossaryArray = $this->convertGlossaryStringToArray($dictionaryString);
 
-        if (empty($glossaryArray)) {
-            $this->translate->deepL->deleteMultilingualGlossaryDictionary($this->glossary, null, self::sanitizeLocale($sourceLanguage), self::sanitizeLocale($targetLanguage));
-        } else {
-            $dictionaryEntries = new MultilingualGlossaryDictionaryEntries(self::sanitizeLocale($sourceLanguage), self::sanitizeLocale($targetLanguage), $glossaryArray);
-            $this->translate->deepL->replaceMultilingualGlossaryDictionary(
-                $this->glossary, $dictionaryEntries
-            );
+        try {
+            if (empty($glossaryArray)) {
+                $this->translate->deepL->deleteMultilingualGlossaryDictionary($this->glossary, null, self::sanitizeLocale($sourceLanguage), self::sanitizeLocale($targetLanguage));
+            } else {
+                $dictionaryEntries = new MultilingualGlossaryDictionaryEntries(self::sanitizeLocale($sourceLanguage), self::sanitizeLocale($targetLanguage), $glossaryArray);
+                $this->translate->deepL->replaceMultilingualGlossaryDictionary($this->glossary, $dictionaryEntries);
+            }
+        } catch (DeepLException $e) {
+            $this->translate->error($e->getMessage());
         }
     }
 
@@ -104,15 +143,28 @@ class TranslateGlossary {
         return $locale;
     }
 
-    public function dictionaryExists(string $sourceLanguage, string $targetLanguage) {
-        try {
-            $entries = $this->translate->deepL->getMultilingualGlossaryEntries($this->glossary, self::sanitizeLocale($sourceLanguage), self::sanitizeLocale($targetLanguage));
+    public function dictionaryExists(string $sourceLanguage, string $targetLanguage): bool {
+        if (!$this->glossary) {
+            return false;
+        }
 
-        } catch (\DeepL\GlossaryNotFoundException $e) {
+        try {
+            $this->translate->deepL->getMultilingualGlossaryEntries($this->glossary, self::sanitizeLocale($sourceLanguage), self::sanitizeLocale($targetLanguage));
+        } catch (DeepLException) {
             return false;
         }
 
         return true;
+    }
+
+    private function isFreeAccount(): bool {
+        return \DeepL\Translator::isAuthKeyFreeAccount($this->translate->deepLApiKey ?? '');
+    }
+
+    private function saveGlossaryId(?string $id): void {
+        $data = wire('modules')->getConfig('ProcessTranslatePage');
+        $data['deepLGlossaryId'] = $id;
+        wire('modules')->saveConfig('ProcessTranslatePage', $data);
     }
 
     private static function convertGlossaryStringToArray(string $glossaryString = ''): array {
@@ -127,9 +179,7 @@ class TranslateGlossary {
                 continue;
             }
 
-            // Split value at double equal sign (==)
             $entry = explode('==', $row);
-            // Remove blanks around characters
             $entry = array_map(fn($val) => trim($val), $entry);
 
             if (isset($entry[0]) && isset($entry[1]) && $entry[0] && $entry[1]) {
