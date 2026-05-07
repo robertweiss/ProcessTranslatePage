@@ -17,17 +17,19 @@ class GoogleTranslateProvider implements TranslateProviderInterface {
         $this->parent = 'projects/' . $projectId . '/locations/global';
     }
 
-    public function translate(string $text, string $sourceLocale, string $targetLocale): string {
+    public function translate(string $text, string $sourceLocale, string $targetLocale, bool $isHtml = false): string {
         if (trim($text) === '') {
             return '';
         }
-
         $request = (new TranslateTextRequest())
             ->setParent($this->parent)
             ->setContents([$text])
-            ->setMimeType('text/html')
             ->setSourceLanguageCode(self::normalizeLocale($sourceLocale))
             ->setTargetLanguageCode(self::normalizeLocale($targetLocale));
+
+        if ($isHtml) {
+            $request->setMimeType('text/html');
+        }
 
         try {
             $response = $this->client->translateText($request);
@@ -35,7 +37,12 @@ class GoogleTranslateProvider implements TranslateProviderInterface {
             if (count($translations) === 0) {
                 return '';
             }
-            return $translations[0]->getTranslatedText();
+            $result = $translations[0]->getTranslatedText();
+            // Google always returns HTML-encoded output; decode for plain-text fields
+            if (!$isHtml) {
+                $result = html_entity_decode($result, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            }
+            return $result;
         } catch (ApiException $e) {
             $this->module->error($e->getMessage());
             return '';

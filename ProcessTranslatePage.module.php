@@ -410,7 +410,7 @@ class ProcessTranslatePage extends Process implements Module {
         $this->targetLanguages = $this->getTargetLanguages();
     }
 
-    private function translate(string $value, string $targetLanguageLocale): string {
+    private function translate(string $value, string $targetLanguageLocale, bool $isHtml = false): string {
         if (!$targetLanguageLocale) {
             return '';
         }
@@ -420,7 +420,7 @@ class ProcessTranslatePage extends Process implements Module {
             return $value;
         }
 
-        return $this->provider->translate($value, $this->sourceLanguage->translate_locale, $targetLanguageLocale);
+        return $this->provider->translate($value, $this->sourceLanguage->translate_locale, $targetLanguageLocale, $isHtml);
     }
 
     private function processFields($page, $isPageWhichSaveWasHookedOn = true) {
@@ -492,13 +492,13 @@ class ProcessTranslatePage extends Process implements Module {
         $fieldName = $field->name;
         $value = $page->getLanguageValue($this->sourceLanguage, $fieldName);
         $countField = false;
-
+        $isHtml = $field->type instanceof FieldtypeTextareaLanguage && (int)$field->get('contentType') === 1;
         foreach ($this->targetLanguages as $targetLanguage) {
             // If field is empty or translation already exists and should not be overwritten, return
             if (!$value || ($page->getLanguageValue($targetLanguage, $fieldName) != '' && $this->writemode == 'empty')) {
                 continue;
             }
-            $result = $this->translate($value, $targetLanguage->translate_locale);
+            $result = $this->translate($value, $targetLanguage->translate_locale, $isHtml);
             $page->setLanguageValue($targetLanguage, $fieldName, $result);
             $countField = true;
         }

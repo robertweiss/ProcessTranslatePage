@@ -23,14 +23,17 @@ class DeepLTranslateProvider implements TranslateProviderInterface {
         return $this->glossaryManager;
     }
 
-    public function translate(string $text, string $sourceLocale, string $targetLocale): string {
+    public function translate(string $text, string $sourceLocale, string $targetLocale, bool $isHtml = false): string {
         $sourceLocale = self::normalizeLocale($sourceLocale);
         $targetLocale = self::normalizeLocale($targetLocale);
 
         $options = [
             'preserve_formatting' => true,
-            'tag_handling' => 'html',
         ];
+
+        if ($isHtml) {
+            $options['tag_handling'] = 'html';
+        }
 
         if ($this->glossaryManager !== null && $this->glossaryManager->getGlossary() !== null && $this->glossaryManager->dictionaryExists($sourceLocale, $targetLocale)) {
             $options['glossary'] = $this->glossaryManager->getGlossary();
