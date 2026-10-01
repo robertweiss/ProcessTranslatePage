@@ -63,6 +63,7 @@ The free DeepL plan supports only one multilingual glossary across all projects.
 - TextareaLanguage
 - File and image descriptions (including custom file template fields)
 - Combo (ProField)
+- Textareas (ProField) – Text, Textarea, CKEditor or TinyMCE input type
 - RockPageBuilder (3rd party)
 - All of the above inside Repeater, RepeaterMatrix, FieldsetPage, Functional, and Table fields (ProFields)
 

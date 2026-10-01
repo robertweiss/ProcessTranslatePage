@@ -485,6 +485,11 @@ class ProcessTranslatePage extends Process implements Module {
                 $this->processComboFields($field, $page);
                 continue;
             }
+
+            if ($shortType == 'Textareas') {
+                $this->processTextareasField($field, $page);
+                continue;
+            }
         }
     }
 
@@ -659,6 +664,46 @@ class ProcessTranslatePage extends Process implements Module {
         if ($countField) {
             $this->translatedFieldsCount++;
         }
+    }
+
+    private function processTextareasField(Field $field, Page $page) {
+        $fieldName = $field->name;
+        $data = $page->$fieldName;
+        if (!($data instanceof TextareasData) || !$field->get('multilang')) return;
+
+        // All entries share one inputfield type. Only allow plain text, textarea and rich text editors,
+        // other InputfieldText descendants (Email, URL, Name) and non-text inputs must not be translated
+        $inputfieldClass = $field->type->getValueType($field, 'inputfield');
+        $isTextarea = $inputfieldClass === 'InputfieldTextarea' || in_array('InputfieldTextarea', wireClassParents($inputfieldClass));
+        if ($inputfieldClass !== 'InputfieldText' && !$isTextarea) return;
+
+        $isHtml = $isTextarea && (int)$field->get('contentType') === 1;
+
+        foreach ($data->getArray() as $name => $v) {
+            // Ignore language values (e.g. "name___1234")
+            if (strpos($name, '___') !== false) {
+                continue;
+            }
+            $value = $data->getLanguageValue($this->sourceLanguage, $name);
+            $countField = false;
+
+            foreach ($this->targetLanguages as $targetLanguage) {
+                // If field is empty or translation already exists and should not be overwritten, continue
+                if (!$value || ($data->getLanguageValue($targetLanguage, $name) != '' && $this->writemode == 'empty')) {
+                    continue;
+                }
+                $result = $this->translate($value, $targetLanguage->translate_locale, $isHtml);
+                $data->setLanguageValue($targetLanguage, $name, $result);
+                $countField = true;
+            }
+
+            if ($countField) {
+                $this->translatedFieldsCount++;
+            }
+        }
+
+        $page->trackChange($fieldName);
+        $page->save($fieldName);
     }
 
     private function getShortType(string $fieldName): string {
