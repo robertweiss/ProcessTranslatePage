@@ -25,6 +25,8 @@ class ProcessTranslatePage extends Process implements Module {
     private int $translatedFieldsCount = 0;
     private array $changedFields = [];
     private Field $currentField;
+    private bool $translatePageNames = false;
+    private bool $isSavingPageName = false;
 
     private array $textFieldTypes = [
         'PageTitleLanguage',
@@ -202,6 +204,7 @@ class ProcessTranslatePage extends Process implements Module {
         $this->excludedLanguages = $this->get('excludedLanguages') ?: [];
         $this->writemode = $this->get('writemode') ?: 'all';
         $this->showSingleTargetLanguageButtons = !!$this->get('showSingleTargetLanguageButtons');
+        $this->translatePageNames = !!$this->get('translatePageNames');
         $this->throttleSave = 5;
 
         $this->setLanguages();
@@ -259,6 +262,11 @@ class ProcessTranslatePage extends Process implements Module {
         // We need the changed field names as a simple array
         $this->changedFields = array_values($event->arguments(1));
 
+        // Ignore the save we trigger ourselves when writing translated page names
+        if ($this->isSavingPageName) {
+            return;
+        }
+
         // Only start translating if post variable is set
         if (!str_contains($this->input->post->text('_after_submit_action'), 'save_and_translate')) {
             return;
@@ -294,6 +302,7 @@ class ProcessTranslatePage extends Process implements Module {
 
         // Let's go!
         $this->processFields($page);
+        $this->processPageName($page);
         $this->message($this->translatedFieldsCount.' '.__('fields translated.'));
     }
 
@@ -364,6 +373,7 @@ class ProcessTranslatePage extends Process implements Module {
         // Only process page if template is valid
         if (!in_array($page->template->name, array_merge($this->adminTemplates, $this->excludedTemplates))) {
             $this->processFields($page, false);
+            $this->processPageName($page, false);
             echo "Process page {$page->title} ({$page->id})\n";
         }
 
@@ -379,6 +389,7 @@ class ProcessTranslatePage extends Process implements Module {
         $this->initApi();
         $this->initSettings();
         $this->processFields($page, false);
+        $this->processPageName($page, false);
     }
 
     public function ___getSourceLanguage(): Language {
@@ -491,6 +502,90 @@ class ProcessTranslatePage extends Process implements Module {
                 continue;
             }
         }
+    }
+
+    /**
+     * Translate the page name (URL segment) for all target languages.
+     * Uses the already translated title of the target language as source and falls back
+     * to a translation of the source language page name. Requires LanguageSupportPageNames.
+     */
+    private function processPageName(Page $page, bool $isPageWhichSaveWasHookedOn = true): void {
+        if (!$this->translatePageNames || !$this->modules->isInstalled('LanguageSupportPageNames')) {
+            return;
+        }
+
+        // Pages without own URL (home, repeater items, admin pages) are skipped
+        if ($page->id <= 1 || $page instanceof RepeaterPage || $page->template->name === 'repeater' || str_starts_with($page->template->name, 'repeater_')) {
+            return;
+        }
+        if (in_array($page->template->name, array_merge($this->adminTemplates, $this->excludedTemplates))) {
+            return;
+        }
+
+        // Changed mode: only act if the source of the name changed in this save
+        if ($this->writemode == 'changed' && $isPageWhichSaveWasHookedOn) {
+            if (!in_array('name', $this->changedFields) && !in_array('title', $this->changedFields)) {
+                return;
+            }
+        }
+
+        $page->of(false);
+        $sourceName = $this->getLocalPageName($page, $this->sourceLanguage) ?: $page->name;
+        $sourceTitle = trim((string)$page->getLanguageValue($this->sourceLanguage, 'title'));
+        $changed = false;
+
+        foreach ($this->targetLanguages as $targetLanguage) {
+            $nameField = $this->getPageNameField($targetLanguage);
+            $currentName = $targetLanguage->isDefault() ? $page->name : (string)$page->get($nameField);
+
+            if ($currentName !== '' && $this->writemode == 'empty') {
+                continue;
+            }
+
+            // Preferred: translated title of the target language (only if it was actually translated)
+            $targetTitle = trim((string)$page->getLanguageValue($targetLanguage, 'title'));
+            if ($targetTitle !== '' && $targetTitle !== $sourceTitle) {
+                $text = $targetTitle;
+            } else {
+                // Fallback: translate the source page name
+                if (!$sourceName) {
+                    continue;
+                }
+                $text = $this->translate(str_replace(['-', '_'], ' ', $sourceName), $targetLanguage->translate_locale);
+            }
+
+            $slug = $this->sanitizer->pageName($text, Sanitizer::translate);
+            if ($slug === '' || $slug === $currentName) {
+                continue;
+            }
+
+            $slug = $this->pages->names()->uniquePageName([
+                'name' => $slug,
+                'page' => $page,
+                'language' => $targetLanguage,
+            ]);
+
+            $page->set($nameField, $slug);
+            $changed = true;
+        }
+
+        if ($changed) {
+            $this->isSavingPageName = true;
+            try {
+                $page->save();
+            } finally {
+                $this->isSavingPageName = false;
+            }
+            $this->translatedFieldsCount++;
+        }
+    }
+
+    private function getPageNameField(Language $language): string {
+        return $language->isDefault() ? 'name' : 'name'.$language->id;
+    }
+
+    private function getLocalPageName(Page $page, Language $language): string {
+        return (string)$page->get($this->getPageNameField($language));
     }
 
     private function processTextField(Field $field, Page $page) {

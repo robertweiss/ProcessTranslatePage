@@ -29,6 +29,7 @@ class ProcessTranslatePageConfig extends ModuleConfig {
             'excludedLanguages' => [],
             'writemode' => 'empty',
             'showSingleTargetLanguageButtons' => false,
+            'translatePageNames' => false,
         ];
     }
 
@@ -266,6 +267,15 @@ class ProcessTranslatePageConfig extends ModuleConfig {
                 'label' => $this->_('Show single target language buttons'),
                 'description' => $this->_('If checked, the save dropdown will add one button for each allowed target language instead of one button for all languages combined.'),
                 'columnWidth' => 34,
+            ])
+        );
+
+        $inputfields->add(
+            $this->buildInputField('InputfieldCheckbox', [
+                'name+id' => 'translatePageNames',
+                'label' => $this->_('Translate page names (URLs)'),
+                'description' => $this->_('If checked, the page name of each target language is created from the translated title (fallback: translated source page name). Requires the core module »Languages Page Names«. The write mode applies: with »Overwrite all target fields« existing URLs are changed, which can break existing links.'),
+                'columnWidth' => 100,
             ])
         );
 

@@ -43,6 +43,7 @@ Note: Google Cloud Translation does not support glossaries in this module. The `
   - *Translate only if target field is empty* — skips fields that already have a value
   - *Translate only changed fields* — translates only fields that were modified in this save (one level deep; entire Repeater/FieldsetPage fields are translated if any sub-value changes)
   - *Overwrite all target fields* — replaces all existing translations
+- **Translate page names (URLs)** — also creates the page name for each target language, from the translated title (fallback: translated source page name). Requires the core module *Languages Page Names*. Follows the write mode: *empty* only fills empty names, *changed* acts when the title/name changed, *all* overwrites existing URLs (may break existing links). Skips the home page and repeater items
 - **Show Single Target Language Buttons** — adds one button per target language in the save dropdown instead of a single "translate all" button
 - **Excluded Templates** — pages using these templates won't show the translate option
 - **Excluded Fields** — fields to skip during translation
