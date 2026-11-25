@@ -25,7 +25,7 @@ class ProcessTranslatePage extends Process implements Module {
     private int $translatedFieldsCount = 0;
     private array $changedFields = [];
     private Field $currentField;
-    private bool $translatePageNames = false;
+    private string $translatePageNames = '';
     private bool $isSavingPageName = false;
 
     private array $textFieldTypes = [
@@ -204,7 +204,7 @@ class ProcessTranslatePage extends Process implements Module {
         $this->excludedLanguages = $this->get('excludedLanguages') ?: [];
         $this->writemode = $this->get('writemode') ?: 'all';
         $this->showSingleTargetLanguageButtons = !!$this->get('showSingleTargetLanguageButtons');
-        $this->translatePageNames = !!$this->get('translatePageNames');
+        $this->translatePageNames = (string)$this->get('translatePageNames');
         $this->throttleSave = 5;
 
         $this->setLanguages();
@@ -510,7 +510,7 @@ class ProcessTranslatePage extends Process implements Module {
      * to a translation of the source language page name. Requires LanguageSupportPageNames.
      */
     private function processPageName(Page $page, bool $isPageWhichSaveWasHookedOn = true): void {
-        if (!$this->translatePageNames || !$this->modules->isInstalled('LanguageSupportPageNames')) {
+        if ($this->translatePageNames === '' || !$this->modules->isInstalled('LanguageSupportPageNames')) {
             return;
         }
 
@@ -542,12 +542,12 @@ class ProcessTranslatePage extends Process implements Module {
                 continue;
             }
 
-            // Preferred: translated title of the target language (only if it was actually translated)
+            // Mode "title": translated title of the target language (only if it was actually translated)
             $targetTitle = trim((string)$page->getLanguageValue($targetLanguage, 'title'));
-            if ($targetTitle !== '' && $targetTitle !== $sourceTitle) {
+            if ($this->translatePageNames === 'title' && $targetTitle !== '' && $targetTitle !== $sourceTitle) {
                 $text = $targetTitle;
             } else {
-                // Fallback: translate the source page name
+                // Mode "name" (or fallback in mode "title"): translate the source page name
                 if (!$sourceName) {
                     continue;
                 }

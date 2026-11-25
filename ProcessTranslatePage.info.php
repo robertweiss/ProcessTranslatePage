@@ -3,7 +3,7 @@
 $info = array(
 	'title' => 'TranslatePage (DeepL / Google Translate)',
 	'summary' => 'Translates all textfields on a page via DeepL or Google Cloud Translation',
-	'version' => 180,
+	'version' => 181,
 	'author' => 'Robert Weiss',
 	'icon' => 'language',
     'requires' => [
